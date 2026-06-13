@@ -16,7 +16,7 @@ Engineering and operations teams spend a disproportionate amount of time on the 
 
 The initial offering deliberately targets a **narrow, high-value slice**: incidents raised from Splunk alerts, where application logs are the primary evidence. This scope is already validated through manual practice (see §2) and is straightforward to automate. The architecture is designed to **scale to any incident type** by adding connectors and investigation playbooks, without re-architecting the core.
 
-Sentinel keeps a human firmly in the loop: it **investigates and proposes, but never auto-remediates**. This is a deliberate design choice that aligns with the risk posture of regulated environments.
+Sentinel keeps a human firmly in the loop. It investigates and then, working inside an **isolated playground environment**, either develops and validates a candidate **fix** or — when a reliable fix isn't achievable — produces a detailed **investigation synopsis** that helps the team resolve the issue faster. Promotion of any change to production is **human-approved by default**; Sentinel does not autonomously alter production systems. Over time, as the team builds trust in its track record, higher levels of automation can be unlocked selectively on lower-risk systems (see §6). This aligns with the risk posture of regulated environments.
 
 **Headline value:** reduce mean-time-to-diagnosis (MTTD), free senior engineers from repetitive investigation, and capture institutional knowledge about recurring failure modes.
 
@@ -46,20 +46,24 @@ Sentinel (WIP) turns this proven manual loop into a deployable, auditable, reusa
 
 ## 3. Proposed Solution & Vision
 
-**Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and proposed fix.
+**Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and either a validated proposed fix or a detailed investigation synopsis.
 
 **Initial offering (Phase 1):** Splunk-alert-driven incidents.
 - Pull application logs via the Splunk MCP.
 - Scan and correlate logs.
 - Inspect the relevant codebase (codebase should be kept up to date based on deployments - we need the version of the code that's deployed in the prod environment)
 - Query supporting systems as needed (DB - read only user, S3, Snowflake, any relevant system)
-- Produce a structured report: **Overview → Investigation → Root Cause → Proposed Fix (with confidence)**.
+- Produce a structured report: **Overview → Investigation → Root Cause → Proposed Fix or Synopsis (with confidence)**.
+
+**Fix-or-synopsis outcome.** For each in-scope incident Sentinel aims for one of two outcomes: (a) a **validated fix** — reproduced and tested inside an isolated playground environment, then proposed for human review (e.g. as a pull request); or (b) where a reliable fix can't be determined, a **detailed investigation synopsis** (overview, evidence trail, root-cause hypothesis, suggested next steps) that meaningfully shortens the human's path to resolution. Either way the team gets value.
 
 **Design principle — narrow and deep, then broaden:** each new *incident type* is onboarded as a **playbook** plus the **connectors** (MCP servers / APIs) it needs. The core orchestration, reasoning, reporting, governance, and human-in-the-loop layers are reused unchanged.
 
 **Non-goals (initially):**
-- No automatic remediation or code merging. Sentinel proposes; humans approve and apply.
+- No autonomous changes to production. Candidate fixes are developed and validated in an **isolated playground / sandbox environment** and proposed for human review (e.g. as a pull request); promotion to production is always human-approved.
 - No write access to production systems.
+
+*These non-goals reflect the **initial** posture. The longer-term vision (§6) includes earning toward **automated resolution** on lower-tier systems as trust in the agent's track record is established — always fully audited and reversible.*
 
 ---
 
@@ -71,7 +75,7 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 2. **Plan.** The agent selects the appropriate investigation playbook and identifies the evidence sources needed (app name, Splunk index, time window derived from the alert).
 3. **Gather evidence.** It iteratively queries Splunk — searching, refining, and drilling into the relevant log lines rather than dumping everything — then inspects the corresponding code paths and any supporting data (DB, Snowflake, S3).
 4. **Correlate & reason.** The agent builds a causal picture: what error, where in the code, triggered by what condition, supported by what evidence.
-5. **Diagnose & propose.** It produces a structured report with a root-cause hypothesis, a confidence level, the evidence trail, and a concrete proposed fix.
+5. **Diagnose, attempt fix, or synopsise.** The agent forms a root-cause hypothesis with a confidence level and evidence trail. Where feasible it reproduces the issue and develops/validates a candidate fix in an **isolated playground environment**; when a reliable fix isn't achievable, it instead produces a detailed **investigation synopsis** to accelerate human resolution.
 6. **Human review.** The report is posted back to the incident ticket or on teams and the dev team is notified. A human approves, edits, or rejects. Nothing is applied automatically. Maybe we can let the system make a PR on the repo and request human review.
 7. **Capture.** The incident, findings, and the human's verdict are stored to improve future investigations and to build an evaluation dataset.
 
@@ -142,6 +146,7 @@ The single most important architectural choice is standardising data access behi
 - **Confidence and uncertainty.** Every diagnosis carries an explicit confidence level and flags assumptions. A confidently-wrong root cause erodes trust faster than an honest "low confidence."
 - **Full audit trail.** Every tool call, query, and decision is logged and attributable — essential for compliance and for debugging the agent itself.
 - **Model-agnostic.** The LLM is a swappable component behind a provider interface — Bedrock, self-hosted, or local (LM Studio/Ollama) — selected by configuration per client. See §5.6.
+- **Isolated playground environment.** Reproduction and any fix development/validation happen in a sandboxed environment, never against production — letting the agent *test* a candidate fix before proposing it, with zero operational risk. When a reliable fix can't be reached, the agent falls back to a detailed synopsis.
 
 ### 5.5 Codebase context enrichment — the Intent Layer
 
@@ -195,11 +200,13 @@ Supported backends are anything exposing a standard (typically OpenAI-compatible
 
 | Phase | Scope | Capabilities | Goal |
 |---|---|---|---|
-| **Phase 1 — MVP** | Splunk-alert incidents only | Ingest + triage; Splunk log retrieval; read-only code inspection; structured report; HITL approval; post to ticket | Prove value on the already-validated use case; establish governance + audit baseline |
+| **Phase 1 — MVP** | Splunk-alert incidents on lower-tier (Tier 3) systems | Ingest + triage; Splunk log retrieval; read-only code inspection; playground reproduction; structured report (fix or synopsis); HITL approval; post to ticket | Prove value on the already-validated use case, **starting on lower-tier (Tier 3) systems** to improve resolution-time KPIs without risking critical systems; establish governance + audit baseline |
 | **Phase 2 — Breadth & quality** | Add data sources + smarter routing | DB / Snowflake / S3 connectors; incident classification & routing; **Intent Layer codebase enrichment (§5.5)**; RAG over past incidents, runbooks, and architecture docs | Higher-quality diagnoses; handle more Splunk-driven scenarios; system learns each client's environment |
-| **Phase 3 — Expansion & evaluation** | Broader incident types + feedback loop | Additional incident-type playbooks; feedback-driven evaluation against a golden dataset; optional sandboxed fix-validation (run proposed fix against tests) | Generalise beyond Splunk incidents; measurable, improving accuracy |
+| **Phase 3 — Expansion & progressive autonomy** | Broader incident types + feedback loop + earned automation | Additional incident-type playbooks; feedback-driven evaluation against a golden dataset; sandboxed fix-validation (run proposed fix against tests); **progressive autonomy — opt-in auto-apply of validated fixes on lower-tier (Tier 3) systems once track-record/trust thresholds are met, fully audited and reversible** | Generalise beyond Splunk incidents; measurable, improving accuracy; reduce human toil as trust grows |
 
 Each phase is independently shippable and delivers value on its own.
+
+**Progressive autonomy.** Automation is *earned*, not assumed. The agent starts fully human-approved; as its track record on a given system accumulates (humans repeatedly confirming its fixes are correct), the team can opt in to letting it auto-apply validated fixes — beginning on lower-tier (Tier 3) systems where the blast radius is small. Every action remains audited and reversible, and higher-tier systems stay human-gated until explicitly promoted.
 
 ---
 
@@ -210,7 +217,7 @@ This section is treated as a first-class requirement, not an afterthought — it
 | Area | Approach |
 |---|---|
 | **Least privilege** | All system access is **read-only** and scoped to the minimum required. No write access to production. |
-| **No auto-remediation** | The agent proposes; a human approves and applies. Removes the highest-risk failure mode. |
+| **No auto-remediation (by default)** | Fixes are developed and validated in an **isolated playground/sandbox** and proposed for human review (e.g. as a PR); promotion to production is human-approved by default. Auto-apply is only ever unlocked as an explicit, opt-in, audited and reversible capability on lower-tier systems once trust is established (§6). Removes the highest-risk failure mode. |
 | **Trigger endpoint security** | The ingestion webhook is network-exposed and must be authenticated (signed requests / mTLS / allow-listing). Treated as a controlled integration point. |
 | **Secrets management** | All credentials held in a managed secrets store (e.g. AWS Secrets Manager / client equivalent); no secrets in code or config. |
 | **Audit logging** | Every tool call, query, and agent decision is logged immutably and is attributable to a specific incident. |
@@ -232,6 +239,7 @@ This section is treated as a first-class requirement, not an afterthought — it
 | **Client toolchain variance** | Re-work per client | MCP-first abstraction isolates connectors from core |
 | **Model/vendor constraints per client** | Blocked deployment | Model-agnostic interface; Bedrock-hosted option |
 | **"How do we know it's right?" objection** | Adoption resistance | Built-in feedback capture + evaluation dataset from Phase 1 onward |
+| **Required logs unavailable / disabled** | Investigation blocked or incomplete | Verbose logging is sometimes throttled or switched off to control volume/performance impact. Confirm logging coverage during the platform analysis; degrade gracefully to a partial synopsis; flag missing telemetry rather than guessing |
 
 ---
 
@@ -242,6 +250,8 @@ This section is treated as a first-class requirement, not an afterthought — it
 - **Senior-engineer leverage** — removes a bottleneck and frees scarce expertise for design and fixes rather than evidence-gathering.
 - **Consistency** — every in-scope incident gets a thorough, structured investigation regardless of who's on call.
 - **Knowledge capture** — recurring failure patterns become a durable, queryable asset instead of tribal knowledge.
+- **Low-risk proving ground** — by demonstrating first on lower-tier (Tier 3) systems, the platform improves their resolution-time KPIs and builds organisational trust before being extended to higher-tier, business-critical systems.
+- **Partial automation still wins** — value does not require solving everything. Even if the agent fully resolves a subset of incidents and merely *accelerates* the rest via a synopsis (e.g. ~70% resolved, ~30% sped up), the net benefit is large. "Some of the solution" beats "none of the solution."
 - **Scalability** — once built, the marginal cost of investigating an additional in-scope incident is low.
 
 **Suggested success metrics (baseline before rollout, then track):**
@@ -294,7 +304,7 @@ This section is treated as a first-class requirement, not an afterthought — it
 | Go-live + handover | 0.5–1 | 0.5–1 wk | |
 | **Total** | **~7–11 person-weeks** | **~8–14 weeks elapsed** | Elapsed time dominated by security/onboarding gates, not build effort. |
 
-**Key driver:** in regulated clients (banks), the security review and access-provisioning gates typically set the timeline. Engineering work is often ready and waiting on approvals. Engaging infosec early materially shortens elapsed time.
+**Key driver:** in regulated clients (banks), the security review and access-provisioning gates typically set the timeline — as does the **dev → test → production promotion process**, where each environment hand-off carries its own approvals and hoops that add elapsed time well beyond the actual build effort. Engineering work is often ready and waiting on approvals. Engaging infosec and change-approval functions early materially shortens elapsed time.
 
 ### 10.3 Incremental incident types (Phase 2 / 3)
 
@@ -328,9 +338,12 @@ This is the payoff of the MCP-first design: capability grows roughly linearly wi
   - No client code, logs, or data ever leave the client boundary; LLM inference uses in-environment/in-region Bedrock.
   - Trade-off: each client requires its own provisioning, upgrade, and operational handling — there is no shared central instance to maintain. This is reflected in the per-client effort estimates (§10.2).
 
+- **Rollout strategy — prove on lower-tier (Tier 3) systems first.** Initial deployment targets lower-criticality (Tier 3) platforms, where the agent can demonstrably improve resolution-time KPIs and build trust without risk to business-critical systems, before scaling up to higher tiers. (Stakeholder/targeting strategy is internal — see Appendix A.)
+
+- **Commercial engagement model — fixed-fee analysis, then scaled implementation.** Engagements begin with a small fixed-fee Proof of Concept / platform analysis (indicative **~£5k**) that scopes the target platform and determines the implementation cost. Implementation then follows on a **tiered / Time-and-Materials** basis. Because each platform requires its own **knowledge-base curation** (and sometimes additional access engineering to reach platform-specific data), implementation effort and cost vary with system complexity (§10.2).
+
 ### 11.2 Open questions
 
-- **Commercial model:** internal capability, per-seat, per-incident, or platform licence?
 - **ServiceNow integration depth:** webhook vs. poller, and how findings are written back (work notes, attachments, custom fields).
 - **LLM approval per client:** which models are on each client's approved-vendor list.
 - **Evaluation strategy:** how the golden dataset is sourced and curated from real incidents (with appropriate data handling).
@@ -346,3 +359,57 @@ Proceed with a **Phase 1 MVP** scoped to Splunk-alert incidents, reusing the exi
 ---
 
 *Appendix and detailed component specifications to follow once Phase 1 scope is confirmed.*
+
+---
+
+## Appendix A — Go-to-Market & Rollout Strategy
+
+> **⚠️ INTERNAL ONLY — REMOVE BEFORE CLIENT DISTRIBUTION.** This appendix captures internal targeting, stakeholder, and commercial-strategy notes (from the 5 Jun 2026 strategy call with Simon Treacy). It is not for sharing with prospective clients.
+
+### A.1 Beachhead
+
+- **First client / beachhead:** NatWest — building on existing DSIMLOPS delivery and the Splunk MCP already built there.
+- **Initial proving ground:** lower-tier (Tier 3) systems — demonstrate KPI / resolution-time improvement without touching critical systems, then scale up to higher tiers.
+- **Tier SLA rationale:** Tier 1 platforms need near-instantaneous fixes (little room for an agent to add value before a human must act); Tier 3 platforms typically run a ~3-day resolution turnaround. Delivering an instant automated investigation/fix on Tier 3 directly **turbocharges the monitoring teams' dashboards and resolution-time KPIs** — a compelling, low-risk first win.
+
+### A.2 Target-audience strategy
+
+- **Lead's guidance: pitch to the teams responsible for failure tracking / incident management — not individual platform leads.** Engaging the monitoring/incident-management function opens opportunities across *all* platforms at once, rather than a single platform entry point. If that route doesn't land, fall back to going platform-by-platform.
+- **Strategic door-opener:** **Duncan Pine** — an accredited change approver (signs off MCRs/TCRs on bank-critical systems) whose broader role is tracking alerts/failures across the entire DNA estate and coordinating incident management. He sees failures across all platforms, making him the ideal entry point. Simon to "warm up" this contact before his leave.
+- **Likely first PoC venue:** **Complaints** — where Zein already has strong relationships and context. **James Thurgood** (complaints lead) is the likely **PoC sponsor**, even though the strategic pitch goes in via Duncan Pine. So: pitch broadly via the failure-tracking function, then land the first concrete PoC in Complaints under James Thurgood's sponsorship.
+- **Other warm connections:** Rich (well-connected across NatWest); Simon himself (23 years at NatWest, knows people across all platforms — DNA, Risk, Finance, CNI, Retail, Wealth).
+
+### A.3 Expansion areas (post-beachhead) & market sizing
+
+Following the beachhead, open conversations across independent business areas, each owning its own tech/environments (using broadly the same tooling): **DNA · Risk · Finance · Commercial & Institutional (CNI) · Retail · Wealth**.
+
+- These areas are **independent of each other** — each is a separate sales avenue.
+- Within each area there are **many candidate systems**: DNA ~15–20 systems, Risk ~10, CNI ~30–40, and so on. The agent won't fit every system, but even partial coverage per area represents substantial, repeatable opportunity.
+- The CDD platform (Complaints' home) sits under DNA, which also covers the AWS platform, Snowflake, and other systems — so a single DNA entry can fan out across many systems.
+
+### A.4 Commercial model (internal view)
+
+- **Fixed-fee analysis / PoC (indicative ~£5k):** a small up-front fee to analyse a specific platform; the output scopes and prices that platform's implementation (quoted as a range A–B).
+- **Then either:**
+  - a **fixed price** for that platform's implementation (only quotable *after* the analysis, because complexity varies), or
+  - pure **Time-and-Materials**, rolling out system by system; scale a team (e.g. ~3 people) to parallelise across platforms and deliver faster.
+- **Build-once vs. per-platform delta:** shared components are built once and reused — the **ServiceNow integration**, and any **shared Splunk** that multiple platforms log to. The **delta** charged per platform is the platform-specific work: curating its **knowledge base** and giving the agent the extra **"skills"/connectors** (MCP servers) needed to reach and interpret that platform's data. Bigger/more complex systems = more to scan and more to wire up = higher delta. This is the answer to the inevitable "if you built it once, why does each rollout cost more?" question.
+- **Estimation basis:** think in **days of effort**, ground-up, *including* the dev → test → prod promotion hurdles (which dominate elapsed time at NatWest), to derive the PoC and implementation numbers.
+
+### A.5 Required deliverable
+
+- **Slide deck** (owner: Zein) covering: the problem statement, the current manual investigation process, and the proposed automated agent solution — explaining how it either implements a playground-validated fix or, when a fix isn't possible, provides a detailed investigation synopsis. *(This written proposal is the source material for the deck.)*
+
+### A.6 Next steps & owners
+
+| Action | Owner | Notes |
+|---|---|---|
+| Create proposal slide deck (problem, current process, proposed solution) | Zein | Derived from this document |
+| Identify & reach out to key NatWest stakeholders | Simon | Determine best approach for presenting the solution |
+| Schedule follow-up to review proposal & next steps | Zein | Once leave dates are finalised |
+
+### A.7 Scheduling notes
+
+- **Simon** on leave **10–29** (this month); plans to warm up Duncan Pine before departing.
+- **Zein** on leave **17–19**.
+- Reconnect after Simon returns to finalise the proposal and initiate business-area conversations.

@@ -1,0 +1,292 @@
+# Agentic Incident Investigation Platform — Project Proposal
+
+> **Working name:** *Sentinel* (placeholder)
+> **Document type:** Project proposal / solution brief
+> **Audience:** Internal sponsors and prospective enterprise clients (initial focus: financial services)
+> **Status:** Draft for review
+> **Date:** 2026-06-13
+
+---
+
+## 1. Executive Summary
+
+Engineering and operations teams spend a disproportionate amount of time on the *investigation* phase of incident management — pulling logs, correlating across systems, reading code, and reconstructing what happened — before any fix is even written. This work is repetitive, requires deep context-switching, and is often funnelled to a small number of senior engineers who become bottlenecks.
+
+**Sentinel is an agentic application that automates the investigation of production incidents.** It monitors an incident queue (e.g. ServiceNow), automatically picks up incidents that match a defined scope, gathers evidence from the relevant systems (logs, code, databases, object storage, data warehouse), reasons about the failure, and delivers a structured findings report — *overview, investigation trail, root-cause hypothesis, and a proposed fix* — back to the dev team for review.
+
+The initial offering deliberately targets a **narrow, high-value slice**: incidents raised from Splunk alerts, where application logs are the primary evidence. This scope is already validated through manual practice (see §2) and is straightforward to automate. The architecture is designed to **scale to any incident type** by adding connectors and investigation playbooks, without re-architecting the core.
+
+Sentinel keeps a human firmly in the loop: it **investigates and proposes, but never auto-remediates**. This is a deliberate design choice that aligns with the risk posture of regulated environments.
+
+**Headline value:** reduce mean-time-to-diagnosis (MTTD), free senior engineers from repetitive investigation, and capture institutional knowledge about recurring failure modes.
+
+---
+
+## 2. Problem Statement & Origin
+
+In current client engagements (a bank), the following pattern recurs:
+
+1. An application misbehaves and triggers a **Splunk alert**, which raises an incident in the queue.
+2. The incident is routed to a senior engineer to investigate.
+3. The engineer manually queries Splunk (by app name, index, and time window), pulls the relevant logs, then cross-references the **codebase** and other systems to determine the root cause.
+4. They write up findings and hand a proposed fix to the dev team.
+
+This loop has already been **partially automated ad hoc** — using a custom-built Splunk MCP server combined with an AI coding assistant to query logs and inspect a locally available codebase. The manual process works and is repeatable; it is simply slow, person-dependent, and not productised.
+
+**The problems this creates:**
+
+- **Bottleneck risk:** investigation knowledge concentrated in a few individuals.
+- **Slow MTTD:** evidence-gathering is manual and serial.
+- **Context loss:** findings live in tickets and people's heads; recurring failure patterns aren't systematically captured.
+- **Cost:** senior engineering time spent on mechanical evidence-gathering rather than design and fixes.
+
+Sentinel turns this proven manual loop into a deployable, auditable, reusable product.
+
+---
+
+## 3. Proposed Solution & Vision
+
+**Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and proposed fix.
+
+**Initial offering (Phase 1):** Splunk-alert-driven incidents.
+- Pull application logs via the existing Splunk MCP.
+- Scan and correlate logs.
+- Inspect the relevant codebase.
+- Query supporting systems as needed.
+- Produce a structured report: **Overview → Investigation → Root Cause → Proposed Fix (with confidence)**.
+
+**Design principle — narrow and deep, then broaden:** each new *incident type* is onboarded as a **playbook** plus the **connectors** (MCP servers / APIs) it needs. The core orchestration, reasoning, reporting, governance, and human-in-the-loop layers are reused unchanged.
+
+**Non-goals (initially):**
+- No automatic remediation or code merging. Sentinel proposes; humans approve and apply.
+- No write access to production systems.
+
+---
+
+## 4. How It Works (End-to-End Walkthrough)
+
+Example: a Splunk alert raises a "payment service error rate elevated" incident.
+
+1. **Detect & triage.** Sentinel receives the new incident (webhook or poll), classifies it, and confirms it is in scope (Splunk-originated). Out-of-scope incidents are ignored or routed onward.
+2. **Plan.** The agent selects the appropriate investigation playbook and identifies the evidence sources needed (app name, Splunk index, time window derived from the alert).
+3. **Gather evidence.** It iteratively queries Splunk — searching, refining, and drilling into the relevant log lines rather than dumping everything — then inspects the corresponding code paths and any supporting data (DB, Snowflake, S3).
+4. **Correlate & reason.** The agent builds a causal picture: what error, where in the code, triggered by what condition, supported by what evidence.
+5. **Diagnose & propose.** It produces a structured report with a root-cause hypothesis, a confidence level, the evidence trail, and a concrete proposed fix.
+6. **Human review.** The report is posted back to the incident ticket and the dev team is notified. A human approves, edits, or rejects. Nothing is applied automatically.
+7. **Capture.** The incident, findings, and the human's verdict are stored to improve future investigations and to build an evaluation dataset.
+
+---
+
+## 5. Technical Architecture
+
+### 5.1 Architecture overview
+
+```
+                 ┌─────────────────────────────────────────────┐
+   ServiceNow    │                  SENTINEL                    │
+  incident queue │                                              │
+        │        │   ┌───────────┐      ┌──────────────────┐    │
+        └───────►│   │  Ingestion │─────►│  Triage / Router │    │
+   (webhook /    │   │  & filter  │      │  (in-scope?)     │    │
+    poller)      │   └───────────┘      └────────┬─────────┘    │
+                 │                                │              │
+                 │                       ┌────────▼─────────┐    │
+                 │                       │ Investigation     │   │
+                 │                       │ graph (LangGraph) │   │
+                 │                       │  ┌─────────────┐  │   │
+                 │                       │  │ plan        │  │   │
+                 │                       │  │ gather      │  │   │
+                 │                       │  │ correlate   │  │   │
+                 │                       │  │ root-cause  │  │   │
+                 │                       │  │ propose fix │  │   │
+                 │                       │  └─────────────┘  │   │
+                 │                       └────────┬──────────┘   │
+                 │                                │              │
+                 │        ┌───────────────────────┼────────┐     │
+                 │        │           Tool / MCP layer       │    │
+                 │        │  Splunk · Code · DB · Snowflake  │    │
+                 │        │  · S3 · (future connectors)      │    │
+                 │        └───────────────────────┬──────────┘    │
+                 │                                │              │
+                 │   ┌──────────────┐   ┌─────────▼─────────┐    │
+                 │   │ State store / │   │ Findings report   │    │
+                 │   │ audit log     │◄──┤ + HITL approval   │    │
+                 │   │ (Postgres)    │   └─────────┬─────────┘    │
+                 │   └──────────────┘             │              │
+                 └────────────────────────────────┼──────────────┘
+                                                   ▼
+                            Post to ticket + notify dev team (Slack/Teams)
+```
+
+### 5.2 Recommended tech stack
+
+| Layer | Choice | Rationale |
+|---|---|---|
+| **Agent orchestration** | **LangGraph** | Investigation is a stateful, multi-phase workflow, not a single loop. LangGraph provides graph-based control flow, durable checkpointing, native human-in-the-loop interrupts, and per-node observability — all critical for regulated environments. |
+| **Tool / data integration** | **MCP-first** (`langchain-mcp-adapters`), with direct APIs where MCP is impractical | Reuses the already-built Splunk MCP. Each new incident type = new MCP server(s) + a playbook, not a rewrite. Cleanly decouples reasoning from data access. |
+| **LLM** | **Claude via Amazon Bedrock** (model-agnostic design) | In-account / in-region inference supports data residency and compliance requirements common in banking. Abstract the model behind an interface so it can be swapped per client. |
+| **State & audit store** | **PostgreSQL** (LangGraph checkpointer) | Durable, resumable investigation state plus a complete, queryable audit trail of every decision and tool call. |
+| **Ingestion / trigger** | ServiceNow webhook (preferred) or scheduled poller | Filters the queue down to in-scope incidents at the edge. |
+| **Output / notification** | ServiceNow ticket update + Slack/Teams | Delivers findings where teams already work; keeps the system of record authoritative. |
+| **Knowledge / retrieval (Phase 2+)** | Vector store over past incidents, runbooks, architecture docs | Improves root-cause quality and tailors the agent to each client's systems over time. |
+| **Deployment** | Containerised (e.g. ECS/EKS or client-equivalent), IaC-managed | Portable across client environments; reproducible and auditable. |
+
+### 5.3 Why MCP-first is the key decision
+
+The single most important architectural choice is standardising data access behind **MCP**. It is what makes the "scale to any incident type" vision tractable: the core agent, governance, and reporting layers stay constant, while capability grows by adding connectors and playbooks. It also directly reuses the existing Splunk MCP investment and keeps the system portable across clients with different toolchains.
+
+### 5.4 Key design behaviours
+
+- **Iterative, cost-aware retrieval.** Log volumes can be enormous. The agent searches and narrows rather than ingesting everything, controlling both token cost and accuracy.
+- **Confidence and uncertainty.** Every diagnosis carries an explicit confidence level and flags assumptions. A confidently-wrong root cause erodes trust faster than an honest "low confidence."
+- **Full audit trail.** Every tool call, query, and decision is logged and attributable — essential for compliance and for debugging the agent itself.
+- **Model-agnostic.** The LLM sits behind an interface so it can be swapped to meet a given client's approved-vendor list.
+
+---
+
+## 6. Phased Roadmap
+
+| Phase | Scope | Capabilities | Goal |
+|---|---|---|---|
+| **Phase 1 — MVP** | Splunk-alert incidents only | Ingest + triage; Splunk log retrieval; read-only code inspection; structured report; HITL approval; post to ticket | Prove value on the already-validated use case; establish governance + audit baseline |
+| **Phase 2 — Breadth & quality** | Add data sources + smarter routing | DB / Snowflake / S3 connectors; incident classification & routing; RAG over past incidents, runbooks, and architecture docs | Higher-quality diagnoses; handle more Splunk-driven scenarios; system learns each client's environment |
+| **Phase 3 — Expansion & evaluation** | Broader incident types + feedback loop | Additional incident-type playbooks; feedback-driven evaluation against a golden dataset; optional sandboxed fix-validation (run proposed fix against tests) | Generalise beyond Splunk incidents; measurable, improving accuracy |
+
+Each phase is independently shippable and delivers value on its own.
+
+---
+
+## 7. Security, Compliance & Governance
+
+This section is treated as a first-class requirement, not an afterthought — it is typically what determines approval in a regulated client.
+
+| Area | Approach |
+|---|---|
+| **Least privilege** | All system access is **read-only** and scoped to the minimum required. No write access to production. |
+| **No auto-remediation** | The agent proposes; a human approves and applies. Removes the highest-risk failure mode. |
+| **Trigger endpoint security** | The ingestion webhook is network-exposed and must be authenticated (signed requests / mTLS / allow-listing). Treated as a controlled integration point. |
+| **Secrets management** | All credentials held in a managed secrets store (e.g. AWS Secrets Manager / client equivalent); no secrets in code or config. |
+| **Audit logging** | Every tool call, query, and agent decision is logged immutably and is attributable to a specific incident. |
+| **Sensitive data / PII** | Log content is screened/redacted before reaching the LLM where required; data-residency controls via in-region Bedrock inference. |
+| **Data handling** | No client code, logs, or data sent to third-party endpoints outside the approved boundary. |
+| **Human accountability** | Clear ownership: the agent's output is advisory; the approving engineer remains accountable for any change applied. |
+
+---
+
+## 8. Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| **Hallucinated / incorrect root cause** | Wasted dev time; erosion of trust | Confidence scoring; full evidence trail attached to every claim; HITL review; evaluation against golden dataset |
+| **Token/log-volume cost blow-out** | Unsustainable running cost | Iterative narrowing retrieval; query budgets; caching; monitoring of per-incident cost |
+| **Over-broad system access** | Security exposure | Read-only, least-privilege, scoped credentials; no prod writes |
+| **Trigger endpoint as attack surface** | Unauthorised invocation | Authn on webhook, allow-listing, rate limiting |
+| **Scope creep / "boil the ocean"** | Stalled delivery | Strict phasing; ship Phase 1 narrow and deep before broadening |
+| **Client toolchain variance** | Re-work per client | MCP-first abstraction isolates connectors from core |
+| **Model/vendor constraints per client** | Blocked deployment | Model-agnostic interface; Bedrock-hosted option |
+| **"How do we know it's right?" objection** | Adoption resistance | Built-in feedback capture + evaluation dataset from Phase 1 onward |
+
+---
+
+## 9. Business Case & ROI
+
+**Value drivers:**
+- **Reduced MTTD / MTTR** — investigation is the slowest, most manual phase; automating it compresses time-to-diagnosis.
+- **Senior-engineer leverage** — removes a bottleneck and frees scarce expertise for design and fixes rather than evidence-gathering.
+- **Consistency** — every in-scope incident gets a thorough, structured investigation regardless of who's on call.
+- **Knowledge capture** — recurring failure patterns become a durable, queryable asset instead of tribal knowledge.
+- **Scalability** — once built, the marginal cost of investigating an additional in-scope incident is low.
+
+**Suggested success metrics (baseline before rollout, then track):**
+- Mean time-to-diagnosis for in-scope incidents (before vs. after).
+- % of in-scope incidents auto-investigated.
+- Root-cause accuracy (validated by dev-team feedback).
+- Senior-engineer hours reclaimed per month.
+- Proportion of proposed fixes accepted with little/no modification.
+
+**Cost considerations:** primarily LLM inference (managed via cost-aware retrieval), hosting, and build/maintenance effort. The ROI case rests on reclaimed senior-engineering time and faster incident resolution; both should be baselined per client.
+
+---
+
+## 10. Time & Effort Estimates
+
+> **How to read these numbers.** Estimates are indicative, expressed in **person-weeks of engineering effort** and **elapsed calendar time**, and assume a **small team (1–2 engineers)** with the existing Splunk MCP reused and Claude/Bedrock access available. Elapsed time for client work is typically driven by **client-side gates** (security review, access provisioning, procurement) far more than by engineering effort — those are called out explicitly.
+
+### 10.1 Proof of Concept (internal)
+
+**Objective:** a working end-to-end demo that investigates real, historical Splunk-driven incidents and produces a structured findings report — sufficient to validate quality and to demo to prospects. Ingestion can be simplified (manual trigger or single-queue poll) for the POC.
+
+| Workstream | Effort (person-weeks) |
+|---|---|
+| Core LangGraph orchestration — graph, state, checkpointing | 1.5–2 |
+| Splunk MCP integration + iterative/cost-aware log retrieval | ~1 (reuses existing MCP) |
+| Read-only code-inspection connector | 0.5–1 |
+| Reasoning & prompting + structured report (overview / investigation / root cause / proposed fix + confidence) | 1.5–2 |
+| Simplified ingestion & triage (manual or single-queue) | 0.5–1 |
+| Human-in-the-loop + output (post report, notify) | ~0.5 |
+| Audit-logging baseline | ~0.5 |
+| Tuning & validation against real historical incidents | ~1 |
+| **Total** | **~6–8 person-weeks** |
+
+**Elapsed time:** ~6–8 weeks with one engineer; ~4–5 weeks with two working in parallel.
+
+**Exit criteria:** the POC correctly diagnoses a meaningful share of a sample set of past Splunk-driven incidents, with evidence trails and confidence levels that senior engineers judge credible.
+
+### 10.2 Per-Client Implementation (Phase 1 rollout)
+
+**Objective:** Sentinel running in a client's environment against their live in-scope incidents, integrated with their ServiceNow queue, security-approved, and accepted by their dev team.
+
+| Stage | Eng. effort (person-weeks) | Elapsed | Notes |
+|---|---|---|---|
+| Discovery + security/compliance review | 0.5–1 | **2–4 wks** | Usually the **long pole**; client-driven (infosec, data handling, procurement). Low engineering effort, high wait time. |
+| Environment & access setup (scoped read-only creds, network, secrets, deployment) | 1–2 | 1–2 wks | Often overlaps with security review. |
+| Connector wiring (Splunk index/app mapping, code access, client-specific systems) | 1–2 | 1–2 wks | |
+| ServiceNow integration (webhook/poll + findings write-back format) | ~1 | ~1 wk | |
+| Tuning & playbook calibration on the client's incidents | 2–3 | 2–3 wks | Drives diagnosis quality for that environment. |
+| UAT with dev team + feedback-loop setup | 1–2 | 1–2 wks | |
+| Go-live + handover | 0.5–1 | 0.5–1 wk | |
+| **Total** | **~7–11 person-weeks** | **~8–14 weeks elapsed** | Elapsed time dominated by security/onboarding gates, not build effort. |
+
+**Key driver:** in regulated clients (banks), the security review and access-provisioning gates typically set the timeline. Engineering work is often ready and waiting on approvals. Engaging infosec early materially shortens elapsed time.
+
+### 10.3 Incremental incident types (Phase 2 / 3)
+
+Once the platform is live at a client, each **new incident type** is additive — a new connector (MCP) plus an investigation playbook — reusing the core orchestration, governance, and reporting unchanged:
+
+| Item | Effort | Elapsed |
+|---|---|---|
+| New incident-type playbook + connector (per type) | ~1–3 person-weeks | 1–3 wks (+ any new security review for new data access) |
+| RAG / knowledge layer (past incidents, runbooks, docs) | ~2–3 person-weeks | one-off, reused across types |
+
+This is the payoff of the MCP-first design: capability grows roughly linearly with low marginal effort, rather than requiring re-architecture.
+
+### 10.4 Summary
+
+| Milestone | Engineering effort | Elapsed (typical) |
+|---|---|---|
+| **Internal POC** | ~6–8 person-weeks | ~4–8 weeks |
+| **First client implementation (Phase 1)** | ~7–11 person-weeks | ~8–14 weeks (gated by client security/onboarding) |
+| **Each additional incident type** | ~1–3 person-weeks | ~1–3 weeks |
+
+> These figures assume scope discipline (Phase 1 stays narrow). The largest schedule risks are scope creep and client-side approval timelines — both addressed in §8.
+
+---
+
+## 11. Open Questions / Decisions Needed
+
+- **Hosting model per client:** SaaS-style central deployment vs. fully in-client-environment (likely required for banks). This affects architecture and commercials.
+- **Commercial model:** internal capability, per-seat, per-incident, or platform licence?
+- **ServiceNow integration depth:** webhook vs. poller, and how findings are written back (work notes, attachments, custom fields).
+- **LLM approval per client:** which models are on each client's approved-vendor list.
+- **Evaluation strategy:** how the golden dataset is sourced and curated from real incidents (with appropriate data handling).
+- **Product name & branding.**
+
+---
+
+## 12. Recommendation
+
+Proceed with a **Phase 1 MVP** scoped to Splunk-alert incidents, reusing the existing Splunk MCP, built on LangGraph with an MCP-first integration layer and Bedrock-hosted Claude. Establish the governance, audit, and feedback foundations from day one so the platform is both demonstrably safe for regulated clients and positioned to scale to additional incident types in later phases.
+
+---
+
+*Appendix and detailed component specifications to follow once Phase 1 scope is confirmed.*

@@ -124,7 +124,7 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 |---|---|---|
 | **Agent orchestration** | **LangGraph** | Investigation is a stateful, multi-phase workflow, not a single loop. LangGraph provides graph-based control flow, durable checkpointing, native human-in-the-loop interrupts, and per-node observability — all critical for regulated environments. |
 | **Tool / data integration** | **MCP-first** (`langchain-mcp-adapters`), with direct APIs where MCP is impractical | Reuses the already-built Splunk MCP. Each new incident type = new MCP server(s) + a playbook, not a rewrite. Cleanly decouples reasoning from data access. |
-| **LLM** | **Claude via Amazon Bedrock** (model-agnostic design) | In-account / in-region inference supports data residency and compliance requirements common in banking. Abstract the model behind an interface so it can be swapped per client. |
+| **LLM** | **Pluggable, model-agnostic** (§5.6) — default Claude via Amazon Bedrock; switchable to self-hosted/in-VPC or local (LM Studio, Ollama) | In-account / in-region or fully local inference supports data residency and compliance. The model sits behind a provider interface and is selected by configuration per client. |
 | **State & audit store** | **PostgreSQL** (LangGraph checkpointer) | Durable, resumable investigation state plus a complete, queryable audit trail of every decision and tool call. |
 | **Ingestion / trigger** | ServiceNow webhook (preferred) or scheduled poller | Filters the queue down to in-scope incidents at the edge. |
 | **Output / notification** | ServiceNow ticket update + Slack/Teams | Delivers findings where teams already work; keeps the system of record authoritative. |
@@ -141,7 +141,7 @@ The single most important architectural choice is standardising data access behi
 - **Iterative, cost-aware retrieval.** Log volumes can be enormous. The agent searches and narrows rather than ingesting everything, controlling both token cost and accuracy.
 - **Confidence and uncertainty.** Every diagnosis carries an explicit confidence level and flags assumptions. A confidently-wrong root cause erodes trust faster than an honest "low confidence."
 - **Full audit trail.** Every tool call, query, and decision is logged and attributable — essential for compliance and for debugging the agent itself.
-- **Model-agnostic.** The LLM sits behind an interface so it can be swapped to meet a given client's approved-vendor list.
+- **Model-agnostic.** The LLM is a swappable component behind a provider interface — Bedrock, self-hosted, or local (LM Studio/Ollama) — selected by configuration per client. See §5.6.
 
 ### 5.5 Codebase context enrichment — the Intent Layer
 
@@ -165,6 +165,29 @@ This context is **built** by automated cartography over the repos, ideally augme
 **Build vs. integrate:** the philosophy can be realised either by integrating a dedicated provider (e.g. Intent Systems) or by building an equivalent cartography step into Sentinel's onboarding. Because delivery is plain in-repo files, either route is compatible with the fully in-client deployment model. This is captured as an open decision (§11.2).
 
 **Caveat — where it pays off.** The Intent Layer delivers the most value on larger codebases (roughly above 1M tokens, ~50–100K lines). Below that threshold, agents can usually navigate the code unaided and the enrichment overhead may not be justified. The exception is **many small services**: even when each repo is modest, the cross-repo contracts and implicit dependencies between them are exactly where the Intent Layer adds disproportionate value — which is the common shape of the microservice estates Sentinel will investigate. The enrichment should therefore be applied selectively, prioritising large monoliths and multi-service estates over small standalone repos.
+
+### 5.6 Model-agnostic LLM layer (first-class design principle)
+
+Sentinel treats the LLM as a **swappable component, not a fixed dependency**. All reasoning calls go through a single internal model-provider interface, so the underlying model can be changed by configuration — per client, per deployment, or even per investigation stage — with no change to the orchestration, tools, or prompts.
+
+Supported backends are anything exposing a standard (typically OpenAI-compatible) inference API, including:
+
+- **Managed cloud** — Amazon Bedrock (default), or other hosted provider APIs.
+- **Self-hosted / in-VPC** — open-weight models served via vLLM, TGI, or similar inside the client's own infrastructure.
+- **Local** — developer or air-gapped machines running **LM Studio**, Ollama, or equivalent, exposing a local endpoint.
+
+**Design requirements to make this real (not just aspirational):**
+- A thin provider abstraction with a uniform request/response contract; provider-specific quirks (auth, streaming, token limits, tool-calling formats) handled behind it.
+- **Configuration-driven selection** — model, endpoint, and credentials set via config/secrets, never hard-coded.
+- Capability negotiation so the agent adapts to a model's context window and tool-calling support rather than assuming a single vendor's features.
+- Prompts kept model-portable, with a thin per-model adaptation layer only where genuinely required.
+- An evaluation harness (§9 metrics) used to benchmark candidate models on real incidents, so model choice is evidence-based per client.
+
+**Why this matters:**
+- **Compliance & approved-vendor lists** — each client can run only models their security/procurement teams have approved.
+- **Data residency & air-gap** — fully local or in-VPC inference keeps all prompts (logs, code) inside the client boundary, reinforcing the in-client deployment decision (§11.1); supports air-gapped environments where no external API is reachable.
+- **Cost & performance tuning** — route to cheaper/faster models for simple steps and stronger models for hard reasoning.
+- **No vendor lock-in** — resilience against pricing, availability, or policy changes from any single provider.
 
 ---
 

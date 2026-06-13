@@ -24,23 +24,23 @@ Sentinel keeps a human firmly in the loop: it **investigates and proposes, but n
 
 ## 2. Problem Statement & Origin
 
-In current client engagements (a bank), the following pattern recurs:
+In current client engagements (DSIMLOPS @ Natwest), the following pattern recurs:
 
-1. An application misbehaves and triggers a **Splunk alert**, which raises an incident in the queue.
-2. The incident is routed to a senior engineer to investigate.
+1. An application misbehaves and triggers a **Splunk alert**, which raises an incident in the queue (Complaints platform has various services -> FRL, CAI, CATE)
+2. The incident is routed to a senior engineer to investigate (generally myself as I've got understanding and visibility over all the applications)
 3. The engineer manually queries Splunk (by app name, index, and time window), pulls the relevant logs, then cross-references the **codebase** and other systems to determine the root cause.
 4. They write up findings and hand a proposed fix to the dev team.
 
-This loop has already been **partially automated ad hoc** — using a custom-built Splunk MCP server combined with an AI coding assistant to query logs and inspect a locally available codebase. The manual process works and is repeatable; it is simply slow, person-dependent, and not productised.
+This loop has already been **partially automated ad hoc** — using a custom-built Splunk MCP server (I built this at Natwest) combined with an AI coding assistant to query logs and inspect a locally available codebase (Kiro). The manual process works and is repeatable; it is simply slow, person-dependent, and not productised.
 
 **The problems this creates:**
 
 - **Bottleneck risk:** investigation knowledge concentrated in a few individuals.
 - **Slow MTTD:** evidence-gathering is manual and serial.
 - **Context loss:** findings live in tickets and people's heads; recurring failure patterns aren't systematically captured.
-- **Cost:** senior engineering time spent on mechanical evidence-gathering rather than design and fixes.
+- **Cost:** engineering time spent on mechanical evidence-gathering rather than design and fixes.
 
-Sentinel turns this proven manual loop into a deployable, auditable, reusable product.
+Sentinel (WIP) turns this proven manual loop into a deployable, auditable, reusable product.
 
 ---
 
@@ -49,10 +49,10 @@ Sentinel turns this proven manual loop into a deployable, auditable, reusable pr
 **Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and proposed fix.
 
 **Initial offering (Phase 1):** Splunk-alert-driven incidents.
-- Pull application logs via the existing Splunk MCP.
+- Pull application logs via the Splunk MCP.
 - Scan and correlate logs.
-- Inspect the relevant codebase.
-- Query supporting systems as needed.
+- Inspect the relevant codebase (codebase should be kept up to date based on deployments - we need the version of the code that's deployed in the prod environment)
+- Query supporting systems as needed (DB - read only user, S3, Snowflake, any relevant system)
 - Produce a structured report: **Overview → Investigation → Root Cause → Proposed Fix (with confidence)**.
 
 **Design principle — narrow and deep, then broaden:** each new *incident type* is onboarded as a **playbook** plus the **connectors** (MCP servers / APIs) it needs. The core orchestration, reasoning, reporting, governance, and human-in-the-loop layers are reused unchanged.
@@ -72,7 +72,7 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 3. **Gather evidence.** It iteratively queries Splunk — searching, refining, and drilling into the relevant log lines rather than dumping everything — then inspects the corresponding code paths and any supporting data (DB, Snowflake, S3).
 4. **Correlate & reason.** The agent builds a causal picture: what error, where in the code, triggered by what condition, supported by what evidence.
 5. **Diagnose & propose.** It produces a structured report with a root-cause hypothesis, a confidence level, the evidence trail, and a concrete proposed fix.
-6. **Human review.** The report is posted back to the incident ticket and the dev team is notified. A human approves, edits, or rejects. Nothing is applied automatically.
+6. **Human review.** The report is posted back to the incident ticket or on teams and the dev team is notified. A human approves, edits, or rejects. Nothing is applied automatically. Maybe we can let the system make a PR on the repo and request human review.
 7. **Capture.** The incident, findings, and the human's verdict are stored to improve future investigations and to build an evaluation dataset.
 
 ---
@@ -82,15 +82,15 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 ### 5.1 Architecture overview
 
 ```
-                 ┌─────────────────────────────────────────────┐
-   ServiceNow    │                  SENTINEL                    │
-  incident queue │                                              │
-        │        │   ┌───────────┐      ┌──────────────────┐    │
+                 ┌───────────────────────────────────────────────┐
+   ServiceNow    │                  SENTINEL                     │
+  incident queue │                                               │
+        │        │   ┌────────────┐      ┌──────────────────┐    │
         └───────►│   │  Ingestion │─────►│  Triage / Router │    │
    (webhook /    │   │  & filter  │      │  (in-scope?)     │    │
-    poller)      │   └───────────┘      └────────┬─────────┘    │
+    poller)      │   └────────────┘      └────────┬─────────┘    │
                  │                                │              │
-                 │                       ┌────────▼─────────┐    │
+                 │                       ┌────────▼──────────┐   │
                  │                       │ Investigation     │   │
                  │                       │ graph (LangGraph) │   │
                  │                       │  ┌─────────────┐  │   │
@@ -102,18 +102,18 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
                  │                       │  └─────────────┘  │   │
                  │                       └────────┬──────────┘   │
                  │                                │              │
-                 │        ┌───────────────────────┼────────┐     │
-                 │        │           Tool / MCP layer       │    │
-                 │        │  Splunk · Code · DB · Snowflake  │    │
-                 │        │  · S3 · (future connectors)      │    │
-                 │        └───────────────────────┬──────────┘    │
+                 │        ┌───────────────────────┼──────────┐   │
+                 │        │           Tool / MCP layer       │   │
+                 │        │  Splunk · Code · DB · Snowflake  │   │
+                 │        │  · S3 · (future connectors)      │   │
+                 │        └───────────────────────┬──────────┘   │
                  │                                │              │
-                 │   ┌──────────────┐   ┌─────────▼─────────┐    │
-                 │   │ State store / │   │ Findings report   │    │
-                 │   │ audit log     │◄──┤ + HITL approval   │    │
-                 │   │ (Postgres)    │   └─────────┬─────────┘    │
-                 │   └──────────────┘             │              │
-                 └────────────────────────────────┼──────────────┘
+                 │   ┌───────────────┐   ┌─────────▼─────────┐   │
+                 │   │ State store / │   │ Findings report   │   │
+                 │   │ audit log     │◄──┤ + HITL approval   │   │
+                 │   │ (Postgres)    │   └─────────┬─────────┘   │
+                 │   └───────────────┘             │             │
+                 └─────────────────────────────────┼─────────────┘
                                                    ▼
                             Post to ticket + notify dev team (Slack/Teams)
 ```
@@ -129,7 +129,8 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 | **Ingestion / trigger** | ServiceNow webhook (preferred) or scheduled poller | Filters the queue down to in-scope incidents at the edge. |
 | **Output / notification** | ServiceNow ticket update + Slack/Teams | Delivers findings where teams already work; keeps the system of record authoritative. |
 | **Knowledge / retrieval (Phase 2+)** | Vector store over past incidents, runbooks, architecture docs | Improves root-cause quality and tailors the agent to each client's systems over time. |
-| **Deployment** | Containerised (e.g. ECS/EKS or client-equivalent), IaC-managed | Portable across client environments; reproducible and auditable. |
+| **Codebase context (Intent Layer)** | Hierarchical "Intent Node" summaries delivered as in-repo `AGENTS.md` / `CLAUDE.md`, auto-refreshed via VCS hooks (§5.5) | Gives the agent a senior engineer's understanding of each codebase; raises diagnosis quality and cuts token cost via progressive disclosure. |
+| **Deployment** | **Fully in-client-environment**, containerised (e.g. ECS/EKS or client-equivalent), IaC-managed, one isolated instance per client | Confirmed hosting model (§11.1): keeps all data and inference inside the client's security/data-residency boundary; reproducible, portable, and auditable per client. |
 
 ### 5.3 Why MCP-first is the key decision
 
@@ -142,6 +143,29 @@ The single most important architectural choice is standardising data access behi
 - **Full audit trail.** Every tool call, query, and decision is logged and attributable — essential for compliance and for debugging the agent itself.
 - **Model-agnostic.** The LLM sits behind an interface so it can be swapped to meet a given client's approved-vendor list.
 
+### 5.5 Codebase context enrichment — the Intent Layer
+
+A major determinant of root-cause quality is **how well the agent understands the codebase it is investigating**. Cold-reading source files on every incident is slow, token-expensive, and error-prone — especially across many small services where the relevant knowledge lives *between* repos (shared contracts, implicit dependencies, cross-cutting patterns) rather than inside any one file.
+
+Sentinel adopts the **Intent Layer philosophy** ([intent-systems.com/intent-layer](https://intent-systems.com/intent-layer)): enrich each codebase ahead of time with dense, hierarchical context that an agent can load, so it arrives at an incident already understanding the architecture. The approach rests on four principles:
+
+- **Fractal compression** — leaf nodes summarise code; parent nodes summarise their children, not raw code. Each layer compresses the one below it.
+- **Hierarchical summarisation** — broad architectural context at the root, specific detail where the agent is working. The agent knows the architecture before reading a line of code.
+- **LCA deduplication** — shared knowledge lives once, at the shallowest node covering all relevant paths. No duplication, no drift.
+- **Progressive disclosure** — minimal context upfront; the agent drills into detail only where the investigation requires it. Lean token budget, high signal.
+
+This context is **built** by automated cartography over the repos, ideally augmented with **expert-captured knowledge** (invariants, edge cases, production lessons that the code itself can't express), and **delivered as in-repo `AGENTS.md` / `CLAUDE.md` files** — versioned with the code, diffable in git, and auto-refreshed via VCS hooks so it stays fresh leaf-first rather than decaying.
+
+**Why this matters specifically for Sentinel:**
+- **Higher diagnosis quality** — the agent reasons with a senior engineer's mental model of the system, directly reducing hallucinated or shallow root causes.
+- **Lower cost** — progressive disclosure means the agent pulls only the context a given incident needs, controlling the token spend that log-heavy investigations otherwise incur.
+- **Cross-service reasoning** — surfaces the inter-repo contracts and dependencies that single-file inspection misses — common in the kind of microservice estates Sentinel will investigate.
+- **Fits the in-client deployment model** — because the Intent Layer is just files living in the client's own repos, it adds no external dependency, database, or API, and stays entirely inside the client's security boundary (§11.1).
+
+**Build vs. integrate:** the philosophy can be realised either by integrating a dedicated provider (e.g. Intent Systems) or by building an equivalent cartography step into Sentinel's onboarding. Because delivery is plain in-repo files, either route is compatible with the fully in-client deployment model. This is captured as an open decision (§11.2).
+
+**Caveat — where it pays off.** The Intent Layer delivers the most value on larger codebases (roughly above 1M tokens, ~50–100K lines). Below that threshold, agents can usually navigate the code unaided and the enrichment overhead may not be justified. The exception is **many small services**: even when each repo is modest, the cross-repo contracts and implicit dependencies between them are exactly where the Intent Layer adds disproportionate value — which is the common shape of the microservice estates Sentinel will investigate. The enrichment should therefore be applied selectively, prioritising large monoliths and multi-service estates over small standalone repos.
+
 ---
 
 ## 6. Phased Roadmap
@@ -149,7 +173,7 @@ The single most important architectural choice is standardising data access behi
 | Phase | Scope | Capabilities | Goal |
 |---|---|---|---|
 | **Phase 1 — MVP** | Splunk-alert incidents only | Ingest + triage; Splunk log retrieval; read-only code inspection; structured report; HITL approval; post to ticket | Prove value on the already-validated use case; establish governance + audit baseline |
-| **Phase 2 — Breadth & quality** | Add data sources + smarter routing | DB / Snowflake / S3 connectors; incident classification & routing; RAG over past incidents, runbooks, and architecture docs | Higher-quality diagnoses; handle more Splunk-driven scenarios; system learns each client's environment |
+| **Phase 2 — Breadth & quality** | Add data sources + smarter routing | DB / Snowflake / S3 connectors; incident classification & routing; **Intent Layer codebase enrichment (§5.5)**; RAG over past incidents, runbooks, and architecture docs | Higher-quality diagnoses; handle more Splunk-driven scenarios; system learns each client's environment |
 | **Phase 3 — Expansion & evaluation** | Broader incident types + feedback loop | Additional incident-type playbooks; feedback-driven evaluation against a golden dataset; optional sandboxed fix-validation (run proposed fix against tests) | Generalise beyond Splunk incidents; measurable, improving accuracy |
 
 Each phase is independently shippable and delivers value on its own.
@@ -177,8 +201,8 @@ This section is treated as a first-class requirement, not an afterthought — it
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| **Hallucinated / incorrect root cause** | Wasted dev time; erosion of trust | Confidence scoring; full evidence trail attached to every claim; HITL review; evaluation against golden dataset |
-| **Token/log-volume cost blow-out** | Unsustainable running cost | Iterative narrowing retrieval; query budgets; caching; monitoring of per-incident cost |
+| **Hallucinated / incorrect root cause** | Wasted dev time; erosion of trust | Confidence scoring; full evidence trail attached to every claim; HITL review; evaluation against golden dataset; **Intent Layer codebase enrichment (§5.5) for deeper code understanding** |
+| **Token/log-volume cost blow-out** | Unsustainable running cost | Iterative narrowing retrieval; query budgets; caching; monitoring of per-incident cost; **Intent Layer progressive disclosure (§5.5)** |
 | **Over-broad system access** | Security exposure | Read-only, least-privilege, scoped credentials; no prod writes |
 | **Trigger endpoint as attack surface** | Unauthorised invocation | Authn on webhook, allow-listing, rate limiting |
 | **Scope creep / "boil the ocean"** | Stalled delivery | Strict phasing; ship Phase 1 narrow and deep before broadening |
@@ -272,13 +296,22 @@ This is the payoff of the MCP-first design: capability grows roughly linearly wi
 
 ---
 
-## 11. Open Questions / Decisions Needed
+## 11. Decisions & Open Questions
 
-- **Hosting model per client:** SaaS-style central deployment vs. fully in-client-environment (likely required for banks). This affects architecture and commercials.
+### 11.1 Confirmed decisions
+
+- **Hosting model — fully deployed within the client environment.** Sentinel runs entirely inside each client's own environment (their cloud account / infrastructure), not as a central multi-tenant SaaS. This keeps all logs, code, and data — and LLM inference — inside the client's security and data-residency boundary, which is the expected posture for regulated clients such as banks. Implications:
+  - Deployment is packaged as portable, IaC-managed infrastructure deployed per client (one isolated instance each).
+  - No client code, logs, or data ever leave the client boundary; LLM inference uses in-environment/in-region Bedrock.
+  - Trade-off: each client requires its own provisioning, upgrade, and operational handling — there is no shared central instance to maintain. This is reflected in the per-client effort estimates (§10.2).
+
+### 11.2 Open questions
+
 - **Commercial model:** internal capability, per-seat, per-incident, or platform licence?
 - **ServiceNow integration depth:** webhook vs. poller, and how findings are written back (work notes, attachments, custom fields).
 - **LLM approval per client:** which models are on each client's approved-vendor list.
 - **Evaluation strategy:** how the golden dataset is sourced and curated from real incidents (with appropriate data handling).
+- **Intent Layer — build vs. integrate:** build codebase cartography into Sentinel's onboarding, or integrate a dedicated provider (e.g. Intent Systems). Both fit the in-client model since delivery is in-repo files (§5.5).
 - **Product name & branding.**
 
 ---

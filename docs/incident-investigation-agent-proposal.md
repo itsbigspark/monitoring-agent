@@ -48,6 +48,8 @@ Sentinel (WIP) turns this proven manual loop into a deployable, auditable, reusa
 
 **Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and either a validated proposed fix or a detailed investigation synopsis.
 
+**Product context — Sentinel within Mission Control.** Sentinel is the **first feature of a broader platform, Mission Control** — an application management & operations cockpit for monitoring/support teams that own many applications across a shared incident queue. Mission Control organises incidents per application (working *off* ServiceNow, which remains the system of record — not replacing it), centralises monitoring dashboards, and — through Sentinel — auto-investigates and resolves incidents. **Sentinel is the wedge we ship first** (the focus of this proposal); the dashboard and analytics capabilities follow on the same foundation. This keeps the initial engagement focused and provable while pointing at a larger platform opportunity.
+
 **Initial offering (Phase 1):** Splunk-alert-driven incidents.
 - Pull application logs via the Splunk MCP.
 - Scan and correlate logs.

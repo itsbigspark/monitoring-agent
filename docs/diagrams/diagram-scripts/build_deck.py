@@ -90,18 +90,23 @@ def chip(s, x, y, w, label, color=LIGHT, tcolor=NAVY, h=Inches(0.95), size=14, b
 # ---------------------------------------------------------------- 1 TITLE
 s = slide()
 rect(s, 0, 0, SW, SH, NAVY)
-rect(s, 0, Inches(4.05), SW, Pt(4), TEAL)
-txt(s, Inches(0.9), Inches(2.5), Inches(11.5), Inches(1.4),
+rect(s, 0, Inches(5.35), SW, Pt(4), TEAL)
+txt(s, Inches(0.9), Inches(2.2), Inches(11.5), Inches(1.4),
     [[("Sentinel", 54, True, WHITE)]])
-txt(s, Inches(0.9), Inches(3.3), Inches(11.5), Inches(0.7),
-    [[("Agentic Incident Investigation", 26, False, TEAL)]])
-txt(s, Inches(0.9), Inches(4.25), Inches(11.5), Inches(1.2),
+txt(s, Inches(0.9), Inches(3.05), Inches(11.5), Inches(0.7),
+    [[("Agentic incident auto-investigation", 26, False, TEAL)]])
+txt(s, Inches(0.9), Inches(3.95), Inches(11.5), Inches(0.6),
+    [[("The first feature of ", 18, False, RGBColor(0xC8,0xD4,0xDE)),
+      ("Mission Control", 18, True, WHITE),
+      (" — an application operations platform.", 18, False, RGBColor(0xC8,0xD4,0xDE))]])
+txt(s, Inches(0.9), Inches(4.6), Inches(11.5), Inches(0.7),
     [[("Automating the investigation of production incidents — from alert to "
-       "root cause and proposed fix.", 18, False, RGBColor(0xC8,0xD4,0xDE))]])
+       "root cause and proposed fix.", 16, False, RGBColor(0xC8,0xD4,0xDE))]])
 txt(s, Inches(0.9), Inches(6.6), Inches(11.5), Inches(0.5),
     [[("Project proposal  ·  Draft for discussion", 13, False, MUTED)]])
 notes(s, "One-line pitch: we turn a manual, senior-engineer-dependent investigation "
          "loop into a deployable agent that diagnoses incidents and proposes fixes. "
+         "Sentinel is the first feature we ship of a broader platform, Mission Control. "
          "Working name 'Sentinel' — placeholder.")
 
 # ---------------------------------------------------------------- 2 PROBLEM
@@ -244,6 +249,29 @@ bullets(s, [
 notes(s, "Three pillars to land: MCP-first (scales), model-agnostic (compliance/lock-in), "
          "in-client (data never leaves). Intent Layer is the quality multiplier.")
 
+# ----------------------------------------------- 8b ARCHITECTURE DIAGRAM
+# Companion visual. Requires sentinel-architecture.png (cropped) from
+# build_architecture.py + crop step; skipped gracefully if absent.
+import os as _os
+_diagram = "/Users/zein/monitoring-agent/docs/diagrams/sentinel-architecture.png"
+if _os.path.exists(_diagram):
+    s = slide()
+    header(s, "Architecture", "Proposed system architecture")
+    from PIL import Image as _Image
+    _cw, _ch = _Image.open(_diagram).size
+    _atop, _abot = Inches(1.55), SH - Inches(0.25)
+    _aw, _ah = SW - Inches(1.0), _abot - Inches(1.55)
+    _asp = _cw / _ch
+    _h = _ah; _w = Emu(int(_h * _asp))
+    if _w > _aw:
+        _w = _aw; _h = Emu(int(_w / _asp))
+    _left = Emu(int((SW - _w) / 2)); _top = Emu(int(_atop + (_ah - _h) / 2))
+    s.shapes.add_picture(_diagram, _left, _top, width=_w, height=_h)
+    notes(s, "Companion visual to the architecture slide: ServiceNow -> ingestion/triage "
+             "-> LangGraph graph -> MCP layer -> read-only data sources; model-agnostic "
+             "LLM + isolated playground on the right; all inside the client boundary; "
+             "outputs go back to ticket / PR / Teams for human review.")
+
 # ---------------------------------------------------------------- 9 SECURITY
 s = slide()
 header(s, "Built for the bank", "Security, compliance & governance — first-class")
@@ -284,7 +312,7 @@ notes(s, "Tier 1 needs instant human action; Tier 3 has slack we can fill — ea
 
 # ---------------------------------------------------------------- 11 SCALE
 s = slide()
-header(s, "How it scales", "One platform today — the whole estate over time")
+header(s, "How it scales", "One system today — the whole estate over time")
 bullets(s, [
     "MCP-first design means new incident types and new systems are additive, "
     "reusing the core agent, governance and reporting unchanged.",
@@ -297,6 +325,87 @@ bullets(s, [
 ], y=Inches(1.9))
 notes(s, "Land the scalability story without internal targeting specifics. Progressive "
          "autonomy reassures: we don't ask for trust up front, we earn it.")
+
+# ----------------------------------------------- 11b MISSION CONTROL
+s = slide()
+header(s, "The bigger picture", "Sentinel is the first feature of Mission Control")
+bullets(s, [
+    "Mission Control is an operations cockpit for the teams that monitor and support "
+    "many applications across a shared incident queue.",
+    "It organises incidents per application, centralises monitoring dashboards, and — "
+    "through Sentinel — auto-investigates and resolves them.",
+], y=Inches(1.7), size=17, gap=8)
+feats = [
+    ("Sentinel", "Auto-investigation\n& resolution", True),
+    ("Incident cockpit", "Per-application,\nhistorical view", False),
+    ("Dashboard hub", "QuickSight, Tableau\nin one place", False),
+    ("Analytics", "MTTR, trends, KPIs", False),
+]
+nf = 4; fgap = Inches(0.3); ftotal = SW - Inches(1.4)
+fcw = Emu(int((ftotal - fgap*(nf-1)) / nf)); fx = Inches(0.7); fy = Inches(3.45)
+for name, desc, first in feats:
+    head_color = TEAL if first else NAVY
+    rect(s, fx, fy, fcw, Inches(1.75), LIGHT)
+    rect(s, fx, fy, fcw, Inches(0.6), head_color)
+    txt(s, fx, fy, fcw, Inches(0.6), [[(name, 15, True, WHITE)]],
+        align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    txt(s, fx, Emu(fy+Inches(0.72)), fcw, Inches(0.8),
+        [[(desc, 12.5, False, SLATE)]], align=PP_ALIGN.CENTER)
+    if first:
+        txt(s, fx, Emu(fy+Inches(1.42)), fcw, Inches(0.3),
+            [[("◆ ships first", 11, True, TEAL)]], align=PP_ALIGN.CENTER)
+    fx = Emu(fx + fcw + fgap)
+rect(s, Inches(0.7), Inches(5.45), ftotal, Inches(0.62), RGBColor(0xE4,0xF3,0xF6))
+txt(s, Inches(0.7), Inches(5.45), ftotal, Inches(0.62),
+    [[("Application catalog — the shared foundation (apps · tiers · repos · log indices · data sources)",
+       13, True, NAVY)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+txt(s, Inches(0.7), Inches(6.35), Inches(12), Inches(0.7),
+    [[("ServiceNow stays the system of record — Mission Control works off it, not instead of it.",
+       14, True, MUTED)]], align=PP_ALIGN.CENTER)
+notes(s, "Frame: we ship Sentinel first (the wedge and the differentiator). It is the first "
+         "feature of a broader platform, Mission Control, for the monitoring teams that own "
+         "many apps. Same in-client deployment. ServiceNow stays authoritative. The dashboard "
+         "hub and analytics follow on the same application-catalog foundation. Keep the focus on "
+         "Sentinel; this slide just shows where it's heading. (The knowledge-capture benefits this "
+         "enables are on the next slide.)")
+
+# ----------------------------------------------- 11c KNOWLEDGE DIVIDEND
+s = slide()
+header(s, "Beyond resolution", "A compounding knowledge dividend")
+txt(s, Inches(0.7), Inches(1.6), Inches(12), Inches(0.7),
+    [[("Sentinel and the support team run on captured knowledge — so the platform turns it "
+       "into a durable, growing asset:", 16, False, SLATE)]])
+kcards = [
+    ("Smoother handovers (KT)",
+     "Dev → support knowledge transfer gets a structured, lasting home instead of fading "
+     "meetings — and it's reusable for every future joiner."),
+    ("Tribal knowledge, captured",
+     "The quirks, edge cases and process lore that live in people's heads become explicit and "
+     "durable — de-risking key-person dependency. Knowledge survives staff turnover."),
+    ("Documentation that pays off",
+     "Sentinel uses your docs to diagnose incidents, so good documentation finally shows "
+     "measurable payoff — faster, better resolution, visible per app."),
+]
+nk = 3; kgap = Inches(0.3); ktotal = SW - Inches(1.4)
+kcw = Emu(int((ktotal - kgap*(nk-1)) / nk)); kx = Inches(0.7); ky = Inches(2.5)
+for t, d in kcards:
+    rect(s, kx, ky, kcw, Inches(3.3), LIGHT)
+    rect(s, kx, ky, kcw, Inches(0.85), NAVY)
+    txt(s, Emu(kx+Inches(0.15)), ky, Emu(kcw-Inches(0.3)), Inches(0.85),
+        [[(t, 15, True, WHITE)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    txt(s, Emu(kx+Inches(0.25)), Emu(ky+Inches(1.05)), Emu(kcw-Inches(0.5)), Inches(2.1),
+        [[(d, 13.5, False, SLATE)]])
+    kx = Emu(kx + kcw + kgap)
+txt(s, Inches(0.7), Inches(6.15), Inches(12), Inches(0.9),
+    [[("A virtuous cycle: the more you capture, the better Sentinel and your support team "
+       "perform — and the more visible the payoff of capturing it.", 15, True, NAVY)]],
+    align=PP_ALIGN.CENTER)
+notes(s, "PRESENTER FRAMING — keep these as UPSIDE, never criticism: (1) frame as 'the platform "
+         "rewards and surfaces good knowledge', not 'your docs are bad'; (2) it's a MULTIPLIER, "
+         "not a prerequisite — Sentinel works on logs + code regardless. Order the story from the "
+         "cleanest point: lead with KT/handover (pure operational win), then tribal-knowledge "
+         "capture (bus-factor / survives turnover), then the documentation flywheel (docs finally "
+         "pay off, visible per-app KPIs).")
 
 # ---------------------------------------------------------------- 12 VALUE
 s = slide()
@@ -363,11 +472,13 @@ txt(s, Inches(0.7), Inches(2.0), Inches(12), Inches(4),
      [("3.  Deliver the PoC on real incidents and review the results.", 20, False, WHITE)],
      [("4.  Agree the rollout plan across systems and areas.", 20, False, WHITE)]],
     space_after=16, line_spacing=1.1)
-txt(s, Inches(0.7), Inches(6.4), Inches(12), Inches(0.7),
+txt(s, Inches(0.7), Inches(6.2), Inches(12), Inches(0.5),
     [[("Let's pick one platform and prove it.", 18, True, TEAL)]])
+txt(s, Inches(0.7), Inches(6.72), Inches(12), Inches(0.4),
+    [[("Sentinel first — the foundation for Mission Control.", 13, False, RGBColor(0xC8,0xD4,0xDE))]])
 notes(s, "Close with a concrete, low-commitment ask: agree one platform and run the "
-         "analysis. Momentum over perfection.")
+         "analysis. Momentum over perfection. Sentinel is step one toward Mission Control.")
 
-out = "/Users/zein/monitoring-agent/docs/sentinel-proposal-deck.pptx"
+out = "/Users/zein/monitoring-agent/docs/slide-deck/sentinel-proposal-deck.pptx"
 prs.save(out)
 print("saved", out, "slides:", len(prs.slides._sldIdLst))

@@ -70,7 +70,23 @@ layer** on top:
 | **Sentinel — resolution** | Agentic auto-investigation; trigger, view findings, approve/edit/reject | **Feature 1 — first to ship** |
 | **Incident cockpit** | Clean per-application, historical, filterable view across the shared queue; ownership, status, SLA/tier, trends | Grows from the Sentinel review screen |
 | **Dashboard hub** | Centralise/embed monitoring dashboards (QuickSight, Tableau, …) per application | Feature 2 (later) |
+| **Pipeline & model health** | Track Airflow DAG runs/failures and LLM-output evaluation metrics per application; surface threshold breaches | Later (expansion) |
 | **Analytics & reporting** | MTTR, recurring-failure patterns, KPIs, exec views | Later |
+
+**Sentinel expansion incident types & trigger sources.** Beyond Splunk-alert application incidents
+(the wedge), the same engine extends to new incident types via *connector + playbook*, reusing the
+core unchanged. Two high-value candidates — both squarely in the data-science/AIOps beachhead:
+
+- **Airflow DAG / task failures** — structured failure events with clear task boundaries,
+  accessible logs, run metadata, and a known recent-change surface (DAG code/config).
+- **LLM-output evaluation-metric breaches** — when an LLM app's quality metrics (e.g. relevance,
+  faithfulness, drift) cross a threshold and fire an alert; Sentinel investigates *why* quality
+  degraded (prompt/model change, data drift, upstream input change).
+
+Both introduce **non-ServiceNow trigger sources** (Airflow failure callbacks/API; **email-based**
+eval alerts), so the intake layer is designed to generalise beyond SNOW from the start. And the
+signals behind them — DAG failure stats, LLM eval scores over time — double as **Mission Control
+monitoring surfaces** (the "Pipeline & model health" module above).
 
 ## 6. Why this is coherent, not scope creep
 

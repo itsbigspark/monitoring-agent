@@ -317,14 +317,17 @@ bullets(s, [
     "MCP-first design means new incident types and new systems are additive, "
     "reusing the core agent, governance and reporting unchanged.",
     "Start with Splunk-driven incidents on microservices; broaden to any incident "
-    "type the queue receives.",
+    "type — e.g. Airflow DAG/task failures, or LLM-output quality-metric alerts.",
+    "Triggers generalise too — ServiceNow today; Airflow events and email alerts next.",
     "Progressive autonomy — automation is earned: human-approved first, then "
     "opt-in auto-apply on lower-tier systems once the track record is proven "
     "(always audited and reversible).",
     "Applicable across independent business areas, each with many candidate systems.",
-], y=Inches(1.9))
+], y=Inches(1.85), gap=9)
 notes(s, "Land the scalability story without internal targeting specifics. Progressive "
-         "autonomy reassures: we don't ask for trust up front, we earn it.")
+         "autonomy reassures: we don't ask for trust up front, we earn it. The Airflow DAG-failure "
+         "and LLM-eval examples are especially apt for a data-science/AIOps buyer — and they also "
+         "become monitoring surfaces in Mission Control (DAG stats, LLM eval-metric trends).")
 
 # ----------------------------------------------- 11b MISSION CONTROL
 s = slide()

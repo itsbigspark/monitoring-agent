@@ -51,13 +51,17 @@ See `sentinel-architecture.svg` for the architectural view.
 Legend — **Maturity:** 🟢 well-understood · 🟡 needs design · 🔴 high uncertainty / novel.
 
 ### [A] Intake & trigger service · 🟡
-**Purpose:** Receive ServiceNow incidents, filter to in-scope (Splunk-originated), parse into a
-normalised `Incident`, and start a graph run.
+**Purpose:** Receive incident signals, filter to in-scope, parse into a normalised `Incident`, and
+start a graph run.
 **Responsibilities:** webhook receiver and/or poller; dedup; scope filter; payload parsing
 (app, index, time window, error signature, tier); enqueue/launch.
 **Key decisions:** webhook vs poll; how to extract structured fields reliably from alert payloads;
 the network-exposed endpoint's auth (signed requests / mTLS / allow-list) and rate-limiting.
-**Depends on:** ServiceNow; [M] runtime; [K] security.
+**Generalise beyond ServiceNow:** ServiceNow is the Phase-1 source, but future incident types bring
+**other trigger sources** — e.g. **Airflow** failure callbacks/API (DAG/task failures) and
+**email-based alerts** (LLM-output evaluation-metric breaches). Design the intake as a pluggable set
+of *source adapters* that all normalise to the same `Incident`, rather than hard-wiring SNOW.
+**Depends on:** ServiceNow (and later Airflow, mail, …); [M] runtime; [K] security.
 
 ### [B] Orchestration core (LangGraph) · 🟢 *(designed)*
 **Purpose:** Drive the investigation lifecycle; own control flow, state, HITL, durability.

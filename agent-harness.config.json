@@ -1,0 +1,190 @@
+{
+  "$schema": "./agent-harness.schema.json",
+  "version": 1,
+  "projectType": "node",
+  "canonicalsDir": "docs/ai/",
+  "project": {
+    "name": "example-project",
+    "domain": "custom",
+    "summary": "Describe the project in one sentence.",
+    "riskLevel": "standard"
+  },
+  "adapters": [
+    "kiro"
+  ],
+  "canonicals": [
+    "AGENTS.md",
+    "agentic-coding-harness.md",
+    "agentic-coding.md",
+    "definition-of-done.md",
+    "product.md",
+    "tech-stack.md",
+    "structure.md",
+    "code-conventions.md",
+    "security-policies.md",
+    "testing-standards.md"
+  ],
+  "profiles": [
+    "language:java-modern",
+    "language:python-modern",
+    "frontend:react-typescript",
+    "backend:api-service",
+    "crosscutting:logging",
+    "crosscutting:observability",
+    "crosscutting:maintainability"
+  ],
+  "skills": [
+    {
+      "name": "bigspark-technical-prose",
+      "path": "agent-harness/skills/bigspark-technical-prose/SKILL.md",
+      "managedBy": "asset-manager",
+      "asset": "bigspark-technical-prose",
+      "version": "0.1.1"
+    }
+  ],
+  "plugins": [],
+  "pluginConfig": {},
+  "topology": {
+    "_comment": "Map logical areas to glob patterns. Keys are freeform. Remove areas that don't apply to your repo.",
+    "java": [
+      "services/*",
+      "apps/*"
+    ],
+    "python": [
+      "apps/*",
+      "services/*"
+    ],
+    "frontend": [
+      "apps/frontend/src"
+    ],
+    "backend": [
+      "apps/backend",
+      "apps/broker",
+      "services/*"
+    ]
+  },
+  "standards": {
+    "dir": "docs/standards"
+  },
+  "gates": [
+    "format",
+    "harness",
+    "context-budget",
+    "profiles",
+    "workflow",
+    "secrets",
+    "backlog",
+    "tasks",
+    "status-regression",
+    "scaffold-drift"
+  ],
+  "workflow": {
+    "mode": "specs-tasks-backlog",
+    "backlog": "docs/specs/BACKLOG.md",
+    "specsDir": "docs/specs",
+    "ticketsDir": "docs/specs/tickets",
+    "completion": "in-pr",
+    "requirePrUrl": true
+  },
+  "kiro": {
+    "referenceStyle": "relative",
+    "steering": {
+      "product": "always",
+      "tech": "always",
+      "structure": "always",
+      "codeConventions": "always",
+      "security": "always",
+      "testing": "fileMatch",
+      "agenticCoding": "manual"
+    },
+    "fileMatches": {
+      "testing": [
+        "**/*.{test,spec}.{ts,tsx,js,jsx}",
+        "**/__tests__/**",
+        "**/tests/**/*.py",
+        "**/test_*.py"
+      ]
+    },
+    "specFolders": {
+      "enabled": true,
+      "root": ".kiro/specs",
+      "template": true
+    }
+  },
+  "generation": {
+    "overwrite": false,
+    "managedMarkers": true,
+    "preserveLocalEdits": true,
+    "diffBeforeWrite": true
+  },
+  "preCommit": {
+    "enabled": true,
+    "entry": "pnpm run",
+    "hooks": {
+      "formatCheck": {
+        "enabled": true
+      },
+      "kiroPromoteSteering": {
+        "enabled": true
+      },
+      "harnessCheck": {
+        "enabled": true
+      },
+      "backlogCheck": {
+        "enabled": true
+      },
+      "kiroPromoteSpecs": {
+        "enabled": true
+      },
+      "kiroCheck": {
+        "enabled": true
+      },
+      "tasksCheck": {
+        "enabled": true
+      },
+      "secretCheck": {
+        "enabled": true
+      }
+    }
+  },
+  "ci": {
+    "enabled": true,
+    "baseBranches": [
+      "main",
+      "dev"
+    ],
+    "specRoot": "docs/specs",
+    "nodeVersion": "20",
+    "lifecycle": {
+      "autoCompleteOnMerge": true,
+      "branches": [
+        "dev"
+      ],
+      "botName": "github-actions[bot]",
+      "botEmail": "41898282+github-actions[bot]@users.noreply.github.com"
+    }
+  },
+  "_kit_version": "0.14.0+009739b",
+  "kit": {
+    "capabilities": [
+      "HARNESS-PROPAGATION",
+      "HARNESS-SKILL-DIRECTORY-PROJECTION",
+      "HARNESS-GENERATE-SYNC",
+      "HARNESS-PRE-COMMIT-HOOK",
+      "HARNESS-POWERS-FIELD",
+      "HARNESS-PRE-COMMIT-HOOK-FIELD",
+      "HARNESS-EXPOSE-CAPABILITIES",
+      "HARNESS-CHECK-PER-ASSET",
+      "HARNESS-CONTEXT-BUDGET-GATE",
+      "HARNESS-KIT-PRECOMMIT-TEMPLATE",
+      "HARNESS-STATUS-REGRESSION-GUARD",
+      "HARNESS-PROJECT-DESCRIPTOR-SCAFFOLD",
+      "HARNESS-SHARED-APPLICATION-GATE-CALLER",
+      "HARNESS-TEMPLATE-CONTENT-DIGEST-V1",
+      "HARNESS-FRAMEWORK-SKILL-CONFORMANCE",
+      "HARNESS-PINNED-SCAFFOLD-REVISION",
+      "HARNESS-SHARED-APPLICATION-BUILD-CALLER",
+      "HARNESS-SHARED-PACKAGE-ECOSYSTEM-CALLERS"
+    ]
+  }
+}

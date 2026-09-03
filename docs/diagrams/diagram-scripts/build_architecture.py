@@ -65,7 +65,7 @@ card(150,640,180,100,["ServiceNow","incident queue"],fill=HL,stroke=NAVY,size=15
 SX,SY,SW_,SH=300,165,820,765
 box(SX,SY,SW_,SH,fill=WHITE,stroke=NAVY,rx=14,sw=2.5)
 text(SX+18,SY+30,"SENTINEL",size=16,color=NAVY,bold=True,anchor="start")
-text(SX+SW_-16,SY+30,"LangGraph · MCP-first · model-agnostic",size=12.5,color=MUTED,anchor="end")
+text(SX+SW_-16,SY+30,"Agents SDK · MCP-first · model-agnostic",size=12.5,color=MUTED,anchor="end")
 
 # top row: ingestion, triage
 card(430,258,200,62,["Ingestion & filter"],fill=LIGHT,stroke=TEAL,size=14)
@@ -75,7 +75,7 @@ card(660,258,200,62,["Triage / Router","in scope?"],fill=LIGHT,stroke=TEAL,size=
 GX,GY,GW,GH=325,335,520,205
 box(GX,GY,GW,GH,fill="#F7FAFB",stroke=BORDER,rx=12)
 add(f'<path d="M{GX+12},{GY} h{GW-24} a12,12 0 0 1 12,12 v22 h{-GW} v-22 a12,12 0 0 1 12,-12 z" fill="{NAVY}"/>')
-text(GX+GW/2,GY+23,"Investigation graph (LangGraph)",size=15,color=WHITE,bold=True)
+text(GX+GW/2,GY+23,"Investigation pipeline (Agents SDK)",size=15,color=WHITE,bold=True)
 nodes=["Plan","Gather","Correlate","Root\ncause","Propose\nfix"]
 nw=90; ncy=GY+128; ng=(GW-len(nodes)*nw)/(len(nodes)+1)
 prev=None
@@ -91,7 +91,7 @@ PROPOSE_X=prev
 MX,MY,MW,MH=325,592,520,56
 box(MX,MY,MW,MH,fill=NAVY,rx=10)
 text(MX+MW/2,MY+MH/2+5,"Tool / MCP layer",size=15,color=WHITE,bold=True)
-text(MX+MW/2,MY+MH-9,"langchain-mcp-adapters · direct APIs",size=11,color="#9FB6C9")
+text(MX+MW/2,MY+MH-9,"Agents SDK MCP · direct APIs",size=11,color="#9FB6C9")
 
 # right column
 RCX=998
@@ -152,6 +152,6 @@ add(f'<line x1="760" y1="{ly}" x2="800" y2="{ly}" stroke="{NAVY}" stroke-width="
 text(810,ly+4,"bidirectional (query / response)",size=12.5,color=MUTED,anchor="start")
 
 add('</svg>')
-path="/Users/zein/monitoring-agent/docs/sentinel-architecture.svg"
+path="/Users/zein/monitoring-agent/docs/diagrams/sentinel-architecture.svg"
 open(path,"w").write("\n".join(out))
 print("saved",path)

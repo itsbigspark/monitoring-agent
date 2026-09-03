@@ -4,7 +4,7 @@
 > **Document type:** Project proposal / solution brief
 > **Audience:** Internal sponsors and prospective enterprise clients (initial focus: financial services)
 > **Status:** Draft for review
-> **Date:** 2026-06-13
+> **Date:** 2026-08-25
 
 ---
 
@@ -18,7 +18,7 @@ The initial offering deliberately targets a **narrow, high-value slice**: incide
 
 Sentinel keeps a human firmly in the loop. It investigates and then, working inside an **isolated playground environment**, either develops and validates a candidate **fix** or — when a reliable fix isn't achievable — produces a detailed **investigation synopsis** that helps the team resolve the issue faster. Promotion of any change to production is **human-approved by default**; Sentinel does not autonomously alter production systems. Over time, as the team builds trust in its track record, higher levels of automation can be unlocked selectively on lower-risk systems (see §6). This aligns with the risk posture of regulated environments.
 
-**Headline value:** reduce mean-time-to-diagnosis (MTTD), free senior engineers from repetitive investigation, and capture institutional knowledge about recurring failure modes.
+**Headline value:** reduce mean-time-to-diagnosis (MTTD), free senior engineers from repetitive investigation, capture institutional knowledge, and enable support teams to operate handed-over applications with less routine dependence on the original development team.
 
 ---
 
@@ -35,7 +35,7 @@ This loop has already been **partially automated ad hoc** — using a custom-bui
 
 **The problems this creates:**
 
-- **Bottleneck risk:** investigation knowledge concentrated in a few individuals.
+- **Bottleneck risk:** investigation and application knowledge are concentrated in a few individuals; support teams must repeatedly return to original developers for routine context.
 - **Slow MTTD:** evidence-gathering is manual and serial.
 - **Context loss:** findings live in tickets and people's heads; recurring failure patterns aren't systematically captured.
 - **Cost:** engineering time spent on mechanical evidence-gathering rather than design and fixes.
@@ -48,7 +48,7 @@ Sentinel (WIP) turns this proven manual loop into a deployable, auditable, reusa
 
 **Vision:** an extensible investigation agent that can be pointed at any incident queue and, for incident types it has been equipped to handle, autonomously produce a high-quality, evidence-backed diagnosis and either a validated proposed fix or a detailed investigation synopsis.
 
-**Product context — Sentinel within Mission Control.** Sentinel is the **first feature of a broader platform, Mission Control** — an application management & operations cockpit for monitoring/support teams that own many applications across a shared incident queue. Mission Control organises incidents per application (working *off* ServiceNow, which remains the system of record — not replacing it), centralises monitoring dashboards, and — through Sentinel — auto-investigates and resolves incidents. **Sentinel is the wedge we ship first** (the focus of this proposal); the dashboard and analytics capabilities follow on the same foundation. This keeps the initial engagement focused and provable while pointing at a larger platform opportunity.
+**Product context — Sentinel within Mission Control.** Sentinel is the **first feature of a broader platform, Mission Control** — an application management & operations cockpit for monitoring/support teams that own many applications across a shared incident queue. Mission Control organises incidents per application (working *off* ServiceNow, which remains the incident system of record), centralises monitoring dashboards, and — through Sentinel — auto-investigates and resolves incidents. **Confluence remains the documentation source of truth**: Mission Control defines application-onboarding documentation requirements, checks completeness/access, and indexes approved content rather than becoming a parallel wiki. **Sentinel is the wedge we ship first** (the focus of this proposal); the dashboard, analytics, and future code-aware Q&A capabilities follow on the same foundation. This keeps the initial engagement focused and provable while pointing at a larger platform opportunity.
 
 **Initial offering (Phase 1):** Splunk-alert-driven incidents.
 - Pull application logs via the Splunk MCP.
@@ -98,7 +98,7 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
                  │                                │              │
                  │                       ┌────────▼──────────┐   │
                  │                       │ Investigation     │   │
-                 │                       │ graph (LangGraph) │   │
+                 │                       │ (Agents SDK)      │   │
                  │                       │  ┌─────────────┐  │   │
                  │                       │  │ plan        │  │   │
                  │                       │  │ gather      │  │   │
@@ -128,13 +128,13 @@ Example: a Splunk alert raises a "payment service error rate elevated" incident.
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| **Agent orchestration** | **LangGraph** | Investigation is a stateful, multi-phase workflow, not a single loop. LangGraph provides graph-based control flow, durable checkpointing, native human-in-the-loop interrupts, and per-node observability — all critical for regulated environments. |
-| **Tool / data integration** | **MCP-first** (`langchain-mcp-adapters`), with direct APIs where MCP is impractical | Reuses the already-built Splunk MCP. Each new incident type = new MCP server(s) + a playbook, not a rewrite. Cleanly decouples reasoning from data access. |
+| **Agent orchestration** | **OpenAI Agents SDK** (plain-Python backbone) for Sentinel; **LangGraph** kept for heavier *future* incident types | The investigation is a deterministic pipeline with two agentic loops (evidence-gathering, fix-validation). The Agents SDK is right-sized for this — its agent/tool/handoff/guardrail model fits the loops, and the human gate is a post-run workflow boundary (no need for heavy mid-run checkpoint/resume). Engine is chosen per incident type behind shared seams, so heavier future workflows can adopt LangGraph without rework. |
+| **Tool / data integration** | **MCP-first** (via the Agents SDK's MCP support), with direct APIs where MCP is impractical | Reuses the already-built Splunk MCP. Each new incident type = new MCP server(s) + a playbook, not a rewrite. Cleanly decouples reasoning from data access. |
 | **LLM** | **Pluggable, model-agnostic** (§5.6) — default Claude via Amazon Bedrock; switchable to self-hosted/in-VPC or local (LM Studio, Ollama) | In-account / in-region or fully local inference supports data residency and compliance. The model sits behind a provider interface and is selected by configuration per client. |
-| **State & audit store** | **PostgreSQL** (LangGraph checkpointer) | Durable, resumable investigation state plus a complete, queryable audit trail of every decision and tool call. |
+| **State & audit store** | **PostgreSQL** (application-managed state + encrypted `Trace`) | A complete, queryable, encrypted audit trail of every decision and tool call (payloads, outputs, timing), plus investigation/review records. |
 | **Ingestion / trigger** | ServiceNow webhook (preferred) or scheduled poller | Filters the queue down to in-scope incidents at the edge. |
 | **Output / notification** | ServiceNow ticket update + Slack/Teams | Delivers findings where teams already work; keeps the system of record authoritative. |
-| **Knowledge / retrieval (Phase 2+)** | Vector store over past incidents, runbooks, architecture docs | Improves root-cause quality and tailors the agent to each client's systems over time. |
+| **Knowledge / retrieval (Phase 2+)** | Permission-aware index over authoritative Confluence docs, runbooks, architecture material, and past incidents; Confluence content remains owned there | Improves root-cause quality and support self-service. The same substrate later powers code-aware Q&A by combining documentation with deployed code/Intent Layer context and authorised incident history. |
 | **Codebase context (Intent Layer)** | Hierarchical "Intent Node" summaries delivered as in-repo `AGENTS.md` / `CLAUDE.md`, auto-refreshed via VCS hooks (§5.5) | Gives the agent a senior engineer's understanding of each codebase; raises diagnosis quality and cuts token cost via progressive disclosure. |
 | **Deployment** | **Fully in-client-environment**, containerised (e.g. ECS/EKS or client-equivalent), IaC-managed, one isolated instance per client | Confirmed hosting model (§11.1): keeps all data and inference inside the client's security/data-residency boundary; reproducible, portable, and auditable per client. |
 
@@ -203,8 +203,8 @@ Supported backends are anything exposing a standard (typically OpenAI-compatible
 | Phase | Scope | Capabilities | Goal |
 |---|---|---|---|
 | **Phase 1 — MVP** | Splunk-alert incidents on lower-tier (Tier 3) systems | Ingest + triage; Splunk log retrieval; read-only code inspection; playground reproduction; structured report (fix or synopsis); HITL approval; post to ticket | Prove value on the already-validated use case, **starting on lower-tier (Tier 3) systems** to improve resolution-time KPIs without risking critical systems; establish governance + audit baseline |
-| **Phase 2 — Breadth & quality** | Add data sources + smarter routing | DB / Snowflake / S3 connectors; incident classification & routing; **Intent Layer codebase enrichment (§5.5)**; RAG over past incidents, runbooks, and architecture docs | Higher-quality diagnoses; handle more Splunk-driven scenarios; system learns each client's environment |
-| **Phase 3 — Expansion & progressive autonomy** | Broader incident types + feedback loop + earned automation | Additional incident-type playbooks — e.g. **Airflow DAG/task failures** and **LLM-output evaluation-metric breaches** (both introduce non-ServiceNow trigger sources: Airflow events/API and email alerts); feedback-driven evaluation against a golden dataset; sandboxed fix-validation (run proposed fix against tests); **progressive autonomy — opt-in auto-apply of validated fixes on lower-tier (Tier 3) systems once track-record/trust thresholds are met, fully audited and reversible** | Generalise beyond Splunk incidents; measurable, improving accuracy; reduce human toil as trust grows |
+| **Phase 2 — Breadth & quality** | Add data sources + governed knowledge retrieval | DB / Snowflake / S3 connectors; incident classification & routing; **Intent Layer codebase enrichment (§5.5)**; application documentation contract; permission-aware indexing of authoritative Confluence content; RAG over docs, runbooks, and past incidents | Higher-quality diagnoses; support-team self-service; handle more Splunk-driven scenarios; system learns each client's environment without becoming a documentation source of truth |
+| **Phase 3 — Expansion & progressive autonomy** | Broader incident types + feedback loop + earned automation | Additional incident-type playbooks — e.g. **Airflow DAG/task failures** and **LLM-output evaluation-metric breaches** (both introduce non-ServiceNow trigger sources: Airflow events/API and email alerts); feedback-driven evaluation against a golden dataset; sandboxed fix-validation; **Ask Mission Control** code-aware Q&A over Confluence + deployed code/Intent Layer context + authorised incident history; **progressive autonomy — opt-in auto-apply of validated fixes on lower-tier (Tier 3) systems once track-record/trust thresholds are met, fully audited and reversible** | Generalise beyond Splunk incidents; measurable, improving accuracy; reduce routine support dependence and human toil as trust grows |
 
 Each phase is independently shippable and delivers value on its own.
 
@@ -251,7 +251,8 @@ This section is treated as a first-class requirement, not an afterthought — it
 - **Reduced MTTD / MTTR** — investigation is the slowest, most manual phase; automating it compresses time-to-diagnosis.
 - **Senior-engineer leverage** — removes a bottleneck and frees scarce expertise for design and fixes rather than evidence-gathering.
 - **Consistency** — every in-scope incident gets a thorough, structured investigation regardless of who's on call.
-- **Knowledge capture** — recurring failure patterns become a durable, queryable asset instead of tribal knowledge.
+- **Support-team independence** — structured onboarding requirements and indexed operational context reduce routine reliance on original developers while preserving escalation for novel issues.
+- **Knowledge capture without a new source of truth** — Confluence stays authoritative; recurring failure patterns and approved operational material become safely retrievable alongside code context.
 - **Low-risk proving ground** — by demonstrating first on lower-tier (Tier 3) systems, the platform improves their resolution-time KPIs and builds organisational trust before being extended to higher-tier, business-critical systems.
 - **Partial automation still wins** — value does not require solving everything. Even if the agent fully resolves a subset of incidents and merely *accelerates* the rest via a synopsis (e.g. ~70% resolved, ~30% sped up), the net benefit is large. "Some of the solution" beats "none of the solution."
 - **Scalability** — once built, the marginal cost of investigating an additional in-scope incident is low.
@@ -277,7 +278,7 @@ This section is treated as a first-class requirement, not an afterthought — it
 
 | Workstream | Effort (person-weeks) |
 |---|---|
-| Core LangGraph orchestration — graph, state, checkpointing | 1.5–2 |
+| Core orchestration (Agents SDK) — backbone, agents, trace | 1.5–2 |
 | Splunk MCP integration + iterative/cost-aware log retrieval | ~1 (reuses existing MCP) |
 | Read-only code-inspection connector | 0.5–1 |
 | Reasoning & prompting + structured report (overview / investigation / root cause / proposed fix + confidence) | 1.5–2 |
@@ -342,6 +343,8 @@ This is the payoff of the MCP-first design: capability grows roughly linearly wi
 
 - **Rollout strategy — prove on lower-tier (Tier 3) systems first.** Initial deployment targets lower-criticality (Tier 3) platforms, where the agent can demonstrably improve resolution-time KPIs and build trust without risk to business-critical systems, before scaling up to higher tiers. (Stakeholder/targeting strategy is internal — see Appendix A.)
 
+- **System-of-record boundaries — ServiceNow for incidents, Confluence for documentation.** Mission Control mirrors/enriches incidents and writes status back to ServiceNow. It defines documentation requirements and stores a permission-aware index with citations, while documentation is authored, governed, and corrected in Confluence. Future code-aware Q&A is an indexed retrieval experience, not a parallel wiki.
+
 - **Commercial engagement model — fixed-fee analysis, then scaled implementation.** Engagements begin with a small fixed-fee Proof of Concept / platform analysis (indicative **~£5k**) that scopes the target platform and determines the implementation cost. Implementation then follows on a **tiered / Time-and-Materials** basis. Because each platform requires its own **knowledge-base curation** (and sometimes additional access engineering to reach platform-specific data), implementation effort and cost vary with system complexity (§10.2).
 
 ### 11.2 Open questions
@@ -350,13 +353,14 @@ This is the payoff of the MCP-first design: capability grows roughly linearly wi
 - **LLM approval per client:** which models are on each client's approved-vendor list.
 - **Evaluation strategy:** how the golden dataset is sourced and curated from real incidents (with appropriate data handling).
 - **Intent Layer — build vs. integrate:** build codebase cartography into Sentinel's onboarding, or integrate a dedicated provider (e.g. Intent Systems). Both fit the in-client model since delivery is in-repo files (§5.5).
+- **Confluence/documentation contract:** mandatory artefacts by tier, connector and permission model, freshness/refresh policy, deletion handling, and Q&A citation/evaluation requirements.
 - **Product name & branding.**
 
 ---
 
 ## 12. Recommendation
 
-Proceed with a **Phase 1 MVP** scoped to Splunk-alert incidents, reusing the existing Splunk MCP, built on LangGraph with an MCP-first integration layer and Bedrock-hosted Claude. Establish the governance, audit, and feedback foundations from day one so the platform is both demonstrably safe for regulated clients and positioned to scale to additional incident types in later phases.
+Proceed with a **Phase 1 MVP** scoped to Splunk-alert incidents, reusing the existing Splunk MCP, built on the **OpenAI Agents SDK** with an MCP-first integration layer and Bedrock-hosted Claude (model-agnostic). Establish the governance, audit, and feedback foundations from day one so the platform is both demonstrably safe for regulated clients and positioned to scale to additional incident types in later phases.
 
 ---
 

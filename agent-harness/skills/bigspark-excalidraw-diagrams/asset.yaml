@@ -1,0 +1,6 @@
+name: bigspark-excalidraw-diagrams
+type: skill
+version: 0.1.0
+description: Brand-disciplined Excalidraw architecture diagrams for Bigspark decks and docs. Use when drawing system / process / topology diagrams that need to match the bigspark-slides palette, with conventions for arrow routing, label placement, and when to use Unicode glyphs over arrow shapes. Companion skill to bigspark-slides.
+supports: [kiro, claude-code, cursor, copilot, codex]
+tags: [diagrams, excalidraw, branding, presentations]

@@ -1,0 +1,6 @@
+name: bigspark-technical-prose
+type: skill
+version: 0.1.1
+description: Draft, review, and rewrite accurate technical documents in Bigspark's direct, evidence-led style.
+supports: [kiro, claude-code, cursor, copilot, codex]
+tags: [documentation, technical-writing, editing, architecture, quality]

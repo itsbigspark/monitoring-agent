@@ -1,0 +1,592 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agent-harness.schema.json",
+  "title": "Agent Harness Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "adapters",
+    "canonicals",
+    "canonicalsDir",
+    "profiles",
+    "gates",
+    "workflow",
+    "kiro"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "_kit_version": {
+      "type": "string",
+      "description": "Managed kit metadata written by agent-harness init/upgrade. Consumers should not edit this field by hand."
+    },
+    "_template": {
+      "type": "object",
+      "description": "Managed immutable lineage for the template asset used to scaffold this repository.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "_scaffold": {
+      "type": "object",
+      "description": "Managed pointer to the descriptor-aware scaffold record.",
+      "additionalProperties": false,
+      "required": [
+        "record"
+      ],
+      "properties": {
+        "record": {
+          "const": ".agent-harness/scaffold.json"
+        }
+      }
+    },
+    "version": {
+      "const": 1
+    },
+    "projectType": {
+      "enum": [
+        "node",
+        "python",
+        "jvm",
+        "polyglot",
+        "none"
+      ],
+      "description": "Selects which kit-shipped pre-commit hook variant the propagator installs. `node` (default), `jvm`, and `polyglot` install the package-runner hook + activation script; `python` installs the python-side hook; `none` opts the consumer out and lets `agent-harness generate --sync` clean up any prior install."
+    },
+    "canonicalsDir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Directory where canonical (cross-agent) files live, relative to repo root. Default 'docs/ai/'. AGENTS.md and CLAUDE.md always remain at repo root for native tool discovery."
+    },
+    "project": {
+      "type": "object",
+      "description": "Project metadata. Used by post-install guidance and agent context. Set name and summary after install so agents understand the repo's purpose.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Logical project name (e.g., 'my-ai-service', 'payments-api')."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Project domain category (e.g., 'observability', 'payments', 'auth', 'custom')."
+        },
+        "summary": {
+          "type": "string",
+          "description": "One-sentence description of what this repo does. Appears in agent context."
+        },
+        "riskLevel": {
+          "type": "string",
+          "description": "Risk classification: 'standard' (default) or 'high' (triggers stricter security gates)."
+        }
+      }
+    },
+    "adapters": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "codex",
+          "claude",
+          "cursor",
+          "copilot",
+          "kiro",
+          "github-ci"
+        ]
+      }
+    },
+    "canonicals": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]+:[a-z0-9-]+$"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "description": "Repo-local skills to project into enabled tool adapters. Asset-manager-managed skills use managedBy=asset-manager and keep their canonical content at path.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "managedBy": {
+                "enum": [
+                  "kit",
+                  "repo",
+                  "asset-manager"
+                ]
+              },
+              "asset": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "powers": {
+      "type": "array",
+      "description": "Repo-local Kiro powers to project into .kiro/powers/<name>/. Powers are a Kiro-specific primitive — when adapters[] does not include 'kiro', generate is a no-op. Asset-manager-managed powers use managedBy=asset-manager and keep their canonical content at path (a POWER.md under agent-harness/powers/<name>/).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "path"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "managedBy": {
+            "enum": [
+              "kit",
+              "repo",
+              "asset-manager"
+            ]
+          },
+          "asset": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "description": "Consumer-owned ESM modules that extend harness:check. Each path is resolved relative to the repository root.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(^|[\\\\/])\\.\\.($|[\\\\/])).+$"
+      }
+    },
+    "pre-commit-hooks": {
+      "type": "array",
+      "description": "Repo-local pre-commit hook scripts the consumer expects to be present. Asset-manager-managed entries set managedBy='asset-manager' and record asset/version. The kit's harness:check validates each declared file exists on disk; consumer wiring of `.pre-commit-config.yaml` remains the consumer's responsibility.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "path"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!.*(^|[\\\\/])\\.\\.($|[\\\\/])).+$"
+          },
+          "managedBy": {
+            "enum": [
+              "asset-manager",
+              "consumer"
+            ]
+          },
+          "asset": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pluginConfig": {
+      "type": "object",
+      "description": "Consumer-owned configuration for check plugins. The kit passes this through to plugins and does not interpret the contents.",
+      "additionalProperties": true
+    },
+    "topology": {
+      "type": "object",
+      "description": "Maps logical code areas to glob patterns. Keys are freeform labels (e.g., 'python', 'typescript', 'frontend', 'infra'). Values are arrays of glob patterns scoping where that area's code lives. Used by profiles to target standards to the right files. Examples: SDK repo: {\"python\": [\"sdk/python/src/**\"], \"typescript\": [\"sdk/typescript/src/**\"]}. Web app: {\"frontend\": [\"apps/web/src/**\"], \"backend\": [\"apps/api/**\"]}.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "standards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "string"
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "format",
+          "harness",
+          "context-budget",
+          "profiles",
+          "workflow",
+          "secrets",
+          "backlog",
+          "tasks",
+          "status-regression",
+          "scaffold-drift",
+          "lifecycle",
+          "mutation"
+        ]
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "backlog",
+            "specs-tasks-backlog"
+          ]
+        },
+        "backlog": {
+          "type": "string"
+        },
+        "specsDir": {
+          "type": "string"
+        },
+        "ticketsDir": {
+          "type": "string"
+        },
+        "completion": {
+          "enum": [
+            "none",
+            "manual",
+            "in-pr"
+          ]
+        },
+        "requirePrUrl": {
+          "type": "boolean"
+        }
+      }
+    },
+    "kiro": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "referenceStyle"
+      ],
+      "properties": {
+        "referenceStyle": {
+          "enum": [
+            "relative",
+            "root"
+          ]
+        },
+        "steering": {
+          "type": "object",
+          "description": "Map of steering key -> mode (string) or override object. Object form accepts {mode, canonical?, title?, fileMatchPattern?} and is required for any steering key not in the kit's default registry.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "enum": [
+                  "always",
+                  "fileMatch",
+                  "manual"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "always",
+                      "fileMatch",
+                      "manual"
+                    ]
+                  },
+                  "canonical": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fileMatchPattern": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "fileMatches": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "specFolders": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "root": {
+              "type": "string"
+            },
+            "template": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "overwrite": {
+          "type": "boolean"
+        },
+        "managedMarkers": {
+          "type": "boolean"
+        },
+        "preserveLocalEdits": {
+          "type": "boolean"
+        },
+        "diffBeforeWrite": {
+          "type": "boolean"
+        }
+      }
+    },
+    "preCommit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pre-commit config generation. When enabled, agent-harness writes `.pre-commit-config.yaml` from the kit template (the-one's 8-hook config). Per-hook enable/disable + entry override are configured here. See HARNESS-KIT-PRECOMMIT-TEMPLATE.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master switch. When false, the file is not generated."
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hook entry prefix (default `pnpm run`). Substituted into each hook's `entry: <prefix> <script>` line."
+        },
+        "hooks": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-hook enable flags. Setting `enabled: false` on any key omits that hook block from the generated file. All hooks default to enabled.",
+          "properties": {
+            "formatCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "kiroPromoteSteering": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "harnessCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "backlogCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "kiroPromoteSpecs": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "kiroCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "tasksCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } },
+            "secretCheck": { "type": "object", "additionalProperties": false, "properties": { "enabled": { "type": "boolean" } } }
+          }
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "CI and build-caller generation. When enabled, agent-harness writes ci.yml and lifecycle-on-merge.yml, plus build.yml when the governed shared application build is selected.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master switch. When false, no CI-block-managed workflow is generated."
+        },
+        "baseBranches": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Branches that trigger CI on push and lifecycle-on-merge on PR close."
+        },
+        "specRoot": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Spec directory the lifecycle workflow stages back to the base branch (the-one default: 'docs/specs')."
+        },
+        "nodeVersion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Node version pinned in actions/setup-node@v4."
+        },
+        "sharedApplicationGate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workflow",
+            "commit",
+            "setupCommand",
+            "packageEcosystem",
+            "gateCommand"
+          ],
+          "description": "Managed full-SHA selection of the canonical shared application gate. Descriptor-aware scaffold policy writes this block; consumers should not substitute another workflow.",
+          "properties": {
+            "workflow": {
+              "const": "itsbigspark/the-one-continuous-integration/.github/workflows/application-gate.yml"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "setupCommand": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\r\\n\\u0000]+$"
+            },
+            "packageEcosystem": {
+              "enum": ["none", "python"],
+              "description": "Private Bigspark package ecosystem selected by the approved shared workflow. Maven and npm are reserved future values and are rejected until implemented."
+            },
+            "gateCommand": {
+              "const": "npm run gate:all"
+            }
+          }
+        },
+        "sharedApplicationBuild": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workflow",
+            "commit",
+            "setupCommand",
+            "packageEcosystem",
+            "gateCommand"
+          ],
+          "description": "Managed full-SHA selection of the canonical shared application build workflow. Descriptor-aware scaffold policy derives setup and gate commands from sharedApplicationGate and writes the thin build.yml caller.",
+          "properties": {
+            "workflow": {
+              "const": "itsbigspark/the-one-continuous-integration/.github/workflows/application-build.yml"
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "setupCommand": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^\\r\\n\\u0000]+$"
+            },
+            "packageEcosystem": {
+              "enum": ["none", "python"],
+              "description": "Private Bigspark package ecosystem inherited from sharedApplicationGate."
+            },
+            "gateCommand": {
+              "const": "npm run gate:all"
+            }
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "autoCompleteOnMerge": {
+              "type": "boolean",
+              "description": "When false, lifecycle-on-merge.yml omits the auto-commit step."
+            },
+            "branches": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Branches the lifecycle workflow watches for merged PRs. Defaults to ['dev'] to match the-one's authoritative shape; broaden to your full base set as your release flow requires."
+            },
+            "botName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "botEmail": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

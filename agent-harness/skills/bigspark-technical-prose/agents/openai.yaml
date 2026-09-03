@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bigspark Technical Prose"
+  short_description: "Draft and edit clear Bigspark technical documents"
+  default_prompt: "Use $bigspark-technical-prose to review and rewrite this technical document without changing its facts."

@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "assets": {
+    "the-one-harness-kit": {
+      "asset": "the-one-harness-kit",
+      "version": "0.1.0",
+      "asset_type": "harness",
+      "source_repo": "itsbigspark/the-one-harness-kit",
+      "source_ref": "main",
+      "source_commit": null,
+      "source_paths": [],
+      "package": null,
+      "package_manager": null,
+      "installed_paths": [
+        "agent-harness.config.json",
+        "AGENTS.md"
+      ],
+      "installed_path_hashes": {},
+      "generated_surfaces": [],
+      "plugin_registrations": [],
+      "plugin_config_keys": [],
+      "installed_by": null,
+      "installed_by_version": null,
+      "declared_ref": null,
+      "staged_dir": null,
+      "bin_shim": null,
+      "tarball_sha256": null
+    },
+    "github-mcp": {
+      "asset": "github-mcp",
+      "version": "",
+      "asset_type": "mcp-server",
+      "source_repo": "github/github-mcp-server",
+      "source_ref": "v1.0.4",
+      "source_commit": null,
+      "source_paths": [],
+      "package": null,
+      "package_manager": null,
+      "installed_paths": [
+        "/Users/zein/.local/share/toam/binaries/github-mcp/v1.0.4/github-mcp-server"
+      ],
+      "installed_path_hashes": {
+        "/Users/zein/.local/share/toam/binaries/github-mcp/v1.0.4/github-mcp-server": "a2348fb9492c3316c98932a9895eebe443c12b6041eddd2b4db12be9bd3c1e2e"
+      },
+      "generated_surfaces": [],
+      "plugin_registrations": [],
+      "plugin_config_keys": [],
+      "installed_by": null,
+      "installed_by_version": null,
+      "declared_ref": null,
+      "staged_dir": null,
+      "bin_shim": null,
+      "tarball_sha256": null
+    },
+    "bigspark-base/bigspark-technical-prose": {
+      "asset": "bigspark-base/bigspark-technical-prose",
+      "version": "0.1.1",
+      "asset_type": "skill",
+      "source_repo": "itsbigspark/bigspark-ai-assets",
+      "source_ref": "main",
+      "source_commit": null,
+      "source_paths": [
+        "skills/bigspark-technical-prose/"
+      ],
+      "package": null,
+      "package_manager": null,
+      "installed_paths": [
+        "agent-harness/skills/bigspark-technical-prose/SKILL.md",
+        "agent-harness/skills/bigspark-technical-prose/agents/openai.yaml",
+        "agent-harness/skills/bigspark-technical-prose/asset.yaml",
+        "agent-harness/skills/bigspark-technical-prose/references/bigspark-voice.md",
+        "agent-harness/skills/bigspark-technical-prose/references/controlled-english.md",
+        "agent-harness/skills/bigspark-technical-prose/references/document-shapes.md",
+        "agent-harness/skills/bigspark-technical-prose/references/prose-smells.md",
+        "agent-harness/skills/bigspark-technical-prose/references/sources.md",
+        "agent-harness/skills/bigspark-technical-prose/references/worked-examples.md",
+        "agent-harness/skills/bigspark-technical-prose/scripts/prose_lint.py"
+      ],
+      "installed_path_hashes": {
+        "agent-harness/skills/bigspark-technical-prose/SKILL.md": "6f6156e1e9810e76f5376873722b984581393c8795c6fa4cbbe03e2cec914e08",
+        "agent-harness/skills/bigspark-technical-prose/agents/openai.yaml": "781f691f7195b8b9cd02948abb2f369549d0bceae8cfa093125834760505e604",
+        "agent-harness/skills/bigspark-technical-prose/asset.yaml": "5eb95133adfa00dfb98833b65214ae94c04434fc6e2963d6c9999fadae169b04",
+        "agent-harness/skills/bigspark-technical-prose/references/bigspark-voice.md": "a19e7f1daf9ca8902bf5212f8f0824759409982ac54d9a1989fdbb7f4eb5e2b0",
+        "agent-harness/skills/bigspark-technical-prose/references/controlled-english.md": "c0689540eb1c7eb27366a200fc4616314fabf8018ef2dd9c201f53ca3755163d",
+        "agent-harness/skills/bigspark-technical-prose/references/document-shapes.md": "33b56e5863daa7b7748c133ee7f9b21e2b04fc71c3d8711eeda877c228b7ed39",
+        "agent-harness/skills/bigspark-technical-prose/references/prose-smells.md": "151bbf6b07419dfa3ec052a1e64f32a80fd7a8156ba17a2661f0a32e530d6b88",
+        "agent-harness/skills/bigspark-technical-prose/references/sources.md": "cde1451b410ca66be762832152cfc7e3d40afdc43b2348a74035387387965605",
+        "agent-harness/skills/bigspark-technical-prose/references/worked-examples.md": "2a493a46cd5396c131ffb8978a45067b1d0be16cdd1cbddd41e5944d09463baf",
+        "agent-harness/skills/bigspark-technical-prose/scripts/prose_lint.py": "0fcfb3de608c1c5e5671948d4ba6f54c05e6598470b6d17a60c2795c0c3aea4a"
+      },
+      "generated_surfaces": [],
+      "plugin_registrations": [],
+      "plugin_config_keys": [],
+      "installed_by": null,
+      "installed_by_version": null,
+      "declared_ref": null,
+      "staged_dir": null,
+      "bin_shim": null,
+      "tarball_sha256": null
+    }
+  }
+}

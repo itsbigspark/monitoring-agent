@@ -3,8 +3,8 @@
 > **Product:** Mission Control — application management & operations platform
 > **First feature:** Sentinel (agentic incident auto-investigation & resolution)
 > **Status:** Vision draft for team review (not a build spec)
-> **Related:** `system-design-overview.md`, `langgraph-orchestration.md`,
-> `../incident-investigation-agent-proposal.md`
+> **Related:** `system-design-overview.md`, `orchestration-core.md`,
+> `incident-investigation-agent-proposal.md`
 
 ---
 
@@ -47,30 +47,52 @@ incident queue. (Beachhead: NatWest AIOps owning DSI-built applications — see 
 go-to-market appendix.) This is exactly the "teams that monitor across many platforms" buyer the
 broader strategy targets — a platform for them, with Sentinel as the reason to adopt.
 
-## 4. Anchoring principle — ServiceNow stays the system of record
+## 4. Anchoring principles — operational systems remain authoritative
+
+Mission Control is a **management, retrieval, and resolution layer** over the systems teams
+already use. It does not create competing sources of truth.
+
+### 4.1 ServiceNow remains the incident system of record
 
 **Mission Control works *off* ServiceNow; it does not replace it.** SNOW remains authoritative for
-incident creation and lifecycle/compliance. Mission Control is the **management and resolution
-layer** on top:
+incident creation and lifecycle/compliance. Mission Control:
 
-- **Mirrors + enriches** SNOW incidents (organisation by application, history, ownership, Sentinel
-  findings, resolution workflow).
-- **Writes status back** to SNOW so the system of record stays current.
-- **Owns** only the value it adds (its organisation/enrichment, the resolution workflow, Sentinel
-  output, analytics) — never a competing copy of the incident lifecycle.
+- **Mirrors + enriches** SNOW incidents with per-application organisation, history, ownership,
+  Sentinel findings, and resolution workflow.
+- **Writes status back** to SNOW so the authoritative incident record stays current.
+- **Owns** only the value it adds — organisation, enrichment, Sentinel output, and analytics — not
+  a competing incident lifecycle.
 
-> Design rule: avoid two sources of truth. Define precisely what Mission Control *owns* vs.
-> *mirrors* from SNOW, and keep write-back one-directional and explicit.
+### 4.2 Confluence remains the documentation system of record
+
+**Mission Control indexes approved documentation; it does not become the place where documentation
+is authored or owned.** Confluence remains authoritative. During application onboarding, Mission
+Control defines a required documentation contract — for example architecture, ownership,
+dependencies, deployment and rollback, dashboards, runbooks, known failure modes, and escalation —
+and records whether each requirement is met.
+
+- **Requirements, not duplicate pages:** the platform specifies what must exist and links to the
+  authoritative Confluence content.
+- **Validated onboarding:** missing, inaccessible, or stale required material is surfaced before
+  the application is considered fully onboarded.
+- **Permission-aware indexing:** approved pages are indexed for Sentinel and support-team retrieval;
+  source links, permissions, and refresh metadata are preserved.
+- **Combined context:** retrieval can join documentation with deployed code/Intent Layer context and
+  authorised incident history without changing ownership of any source.
+
+> Design rule: avoid two sources of truth. Define precisely what Mission Control *owns*, *indexes*,
+> and *mirrors*, and always preserve links back to the authoritative source.
 
 ## 5. Product structure (modules)
 
 | Module | What it is | Status |
 |---|---|---|
-| **Application catalog** *(foundation)* | Registry of the apps a team owns + metadata: tier, owners, repos, log indices, dashboards, data sources, playbooks | Foundation — built first, shared by all features |
+| **Application catalog** *(foundation)* | Registry of apps and operational metadata: tier, owners, repos, log indices, dashboards, data sources, playbooks, required-document checklist, and authoritative Confluence links | Foundation — built first, shared by all features |
 | **Sentinel — resolution** | Agentic auto-investigation; trigger, view findings, approve/edit/reject | **Feature 1 — first to ship** |
 | **Incident cockpit** | Clean per-application, historical, filterable view across the shared queue; ownership, status, SLA/tier, trends | Grows from the Sentinel review screen |
 | **Dashboard hub** | Centralise/embed monitoring dashboards (QuickSight, Tableau, …) per application | Feature 2 (later) |
 | **Pipeline & model health** | Track Airflow DAG runs/failures and LLM-output evaluation metrics per application; surface threshold breaches | Later (expansion) |
+| **Ask Mission Control** | Permission-aware operational Q&A over indexed Confluence documentation, deployed code/Intent Layer context, and authorised incident history, with citations | Future feature |
 | **Analytics & reporting** | MTTR, recurring-failure patterns, KPIs, exec views | Later |
 
 **Sentinel expansion incident types & trigger sources.** Beyond Splunk-alert application incidents
@@ -124,7 +146,9 @@ natural home, rather than adding new surface area.
 2. **Design the seams now** so Mission Control grows without rework:
    - Application catalog as a **first-class data model** from day one.
    - Sentinel review UI built as **Mission Control's first screen**.
-   - ServiceNow **system-of-record boundary** locked early.
+   - ServiceNow and Confluence **system-of-record boundaries** locked early.
+   - Documentation requirements, source links, permissions, and index freshness represented in the
+     application catalog.
 3. **Then** add the dashboard hub, analytics, and further features on the same foundation.
 
 > Discipline: *build Sentinel, shaped so it slots into Mission Control.* Don't build the cockpit
@@ -141,65 +165,85 @@ the platform those rollouts expand into.
 
 ## 10. Secondary benefits
 
-### 10.1 The documentation flywheel
+### 10.1 Documentation requirements and the Confluence indexing flywheel
 
-Sentinel consumes documentation — code comments, runbooks, architecture notes, PR descriptions,
-the Intent Layer context, and past incident write-ups. The better that material is, the sharper its
-diagnoses. So **well-documented services get faster, better automated resolution**, and Mission
-Control makes that payoff **visible and measurable per application for the first time**
-(resolution-time and accuracy KPIs per app).
+Mission Control turns application onboarding into a documented operational contract. It defines the
+minimum material a support team needs — architecture, ownership, dependencies, deployment and
+rollback, dashboards, runbooks, known failure modes, and escalation — then checks that the required
+content exists and is accessible in **Confluence, which remains the source of truth**.
 
-That visibility *is* the incentive: teams finally see documentation pay off — where today it's a
-chore with no tangible reward — which reinforces the documentation habit. Good docs → better
-Sentinel + support → measurably better KPIs → more/better docs.
+Mission Control stores links, requirement status, permissions, and index metadata; it does **not**
+author or own duplicate documentation. Approved Confluence content is indexed for retrieval and
+refreshed on a defined cadence. Every answer or investigation should retain citations back to its
+source so users can verify it and update it in Confluence.
+
+Sentinel also consumes code comments, the deployed codebase and Intent Layer context, and past
+incident write-ups. The better that combined context is, the sharper its diagnoses. Mission Control
+makes the payoff visible through resolution-time and accuracy KPIs per application: good docs →
+better Sentinel + support outcomes → measurable benefit → continued documentation investment.
 
 ### 10.2 Surfacing tacit / tribal knowledge
 
-Beyond documenting ongoing work, the platform creates a natural pull to **externalise the tacit
-knowledge that today lives only in people's heads** — the undocumented quirks, edge cases, and
-process lore ("you just have to know service X behaves oddly when Y"). Because Sentinel and the
-support team can *use* that knowledge to resolve incidents, there is finally a reason to write it
-down — a forcing function that normally doesn't exist.
+The onboarding requirements create a natural pull to **externalise knowledge that today lives only
+in people's heads** — undocumented quirks, edge cases, and process lore. Because Sentinel and the
+support team can use that knowledge day-to-day, there is a practical reason to capture it in the
+authoritative documentation.
 
-- **De-risks key-person dependency / bus factor:** captured knowledge survives staff turnover
-  instead of walking out the door.
-- **This is precisely the Intent Layer's "expert capture" mechanism** — combining automated
-  extraction with the invariants, edge cases, and production lessons that the code itself can't
-  express.
-- Over time the system accumulates a durable, queryable model of each application that gets richer
-  as more is captured.
+- **De-risks key-person dependency / bus factor:** captured knowledge survives staff turnover.
+- **Complements the Intent Layer:** expert operational knowledge adds invariants and production
+  lessons that automated code cartography cannot infer.
+- **Creates a durable operating model:** each application becomes easier to understand as onboarding
+  content and incident learning improve.
 
-### 10.3 Smoother knowledge transfer & handover
+### 10.3 Smoother handover and support-team independence
 
-When an application is handed from the development team to the support/monitoring team, knowledge
-transfer (KT) today is typically a handful of meetings whose content fades and is hard for future
-joiners to recover. Mission Control gives KT a **structured, durable destination**: the app's
-catalog entry, its runbooks, known quirks, and Intent Layer context.
+When an application moves from development to support, knowledge transfer is often concentrated in
+a few meetings and repeated questions to the original developers. Mission Control makes handover
+**"onboard the application against a defined operational contract"**: populate its catalog entry,
+complete the required Confluence material, connect the code and evidence sources, and validate that
+the platform can retrieve them.
 
-- Handover becomes **"stand the application up in Mission Control"** — populate and review its
-  entry — rather than "run a few sessions and hope it sticks."
-- It is **reusable**: every future joiner onboards from the same living record, instead of
-  repeating KT sessions.
-- It compounds with §10.1–10.2: the KT artefacts are exactly what Sentinel and the support team
-  then use day-to-day.
-- This is a **clean, non-sensitive operational win** — a good point to lead with, as it reads as
-  pure benefit rather than any critique of current practice.
+- Support teams can answer routine operational questions and investigate more incidents from the
+  indexed documentation, code context, runbooks, and prior findings.
+- Original developers remain available for genuinely novel or high-complexity issues instead of
+  acting as the default route to recover application context.
+- Every future joiner starts from the same living, authoritative material rather than requiring a
+  new round of knowledge-transfer sessions.
+- Independence is an outcome to measure — for example, fewer developer escalations for routine
+  questions and faster support-led diagnosis — not a claim that development expertise is never
+  needed.
 
-### 10.4 Framing cautions (talking point, not a slide bullet)
+### 10.4 Future feature — code-aware operational Q&A
 
-- Deliver it as an **upside** ("the platform rewards good documentation and surfaces hidden
-  knowledge"), never as a criticism of current docs or as coercion to "brain-dump everything."
-- It is a compounding **multiplier, not a prerequisite** — Sentinel works on logs + code
-  regardless; documentation and captured knowledge just make it better. Avoid implying the product
-  only works with great docs.
+The same retrieval layer can power **Ask Mission Control**, a permission-aware conversational
+interface for application questions. It is intentionally positioned beyond documentation-only
+assistants such as Rovo: answers can combine approved **Confluence documentation with the relevant
+deployed code and Intent Layer context**, plus authorised incident history, while staying inside the
+client boundary.
 
-*Now surfaced as a dedicated, benefit-framed slide ("A compounding knowledge dividend"); the
-framing cautions above live in that slide's speaker notes rather than on the slide itself.*
+This is a **future feature**, not part of the initial Sentinel MVP. It should provide citations,
+identify whether evidence came from documentation, code, or an incident, respect source permissions,
+and state uncertainty when sources conflict or are incomplete. Confluence remains where
+corrections are made; Mission Control re-indexes them rather than becoming a parallel wiki.
+
+### 10.5 Framing cautions
+
+- Present documentation governance as an **operational enabler**, never as criticism of current
+  documentation or a demand to "brain-dump everything."
+- It is a compounding **multiplier, not a prerequisite** — the initial Sentinel workflow can use
+  logs + code while documentation maturity improves.
+- Say **"reduces routine dependence"**, not "eliminates developers from support." Complex and novel
+  issues will still need engineering judgement.
+- Keep code-aware Q&A labelled as roadmap until implemented and evaluated.
 
 ## 11. Open questions
 
 - **Catalog sourcing** — how is the application catalog populated per client (manual, from a CMDB,
   from SNOW/config)?
+- **Documentation contract** — which artefacts are mandatory by application tier, who approves
+  completeness, and what freshness SLA applies?
+- **Confluence integration** — connector/API choice, page and space scope, permission propagation,
+  incremental refresh, deletion handling, and citation format.
 - **Incident→application mapping** — how reliable is classification on a messy shared queue, and
   what's the fallback when it's ambiguous?
 - **Dashboard integration depth** — deep-link vs embedded; per-tool auth.

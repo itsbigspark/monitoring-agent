@@ -1,0 +1,31 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format:check": "node tools/qa/check-format.mjs",
+    "harness:check": "node tools/qa/check-harness.mjs",
+    "harness:reconcile": "node tools/qa/reconcile-harness.mjs",
+    "check-context-budget": "node tools/qa/check-context-budget.mjs",
+    "profiles:check": "node tools/qa/check-profiles.mjs",
+    "workflow:check": "node tools/qa/check-workflow.mjs",
+    "security:secrets": "node tools/qa/check-secrets.mjs",
+    "backlog:check": "node tools/qa/generate-backlog.mjs --check",
+    "backlog:generate": "node tools/qa/generate-backlog.mjs",
+    "regen": "npm run backlog:generate && npm run kiro:sync || npm run backlog:generate",
+    "tasks:check": "node tools/qa/check-tasks-done.mjs",
+    "pickup": "node tools/qa/pickup-ticket.mjs",
+    "complete": "node tools/qa/complete-ticket.mjs",
+    "status:check": "node tools/qa/check-status-regression.mjs",
+    "scaffold-drift:check": "node tools/qa/check-scaffold-drift.mjs",
+    "lifecycle:pr": "node tools/qa/check-lifecycle.mjs --pr",
+    "lifecycle:complete-merged-pr": "node tools/qa/check-lifecycle.mjs --complete-merged-pr",
+    "kiro:sync": "node tools/qa/sync-kiro-specs.mjs",
+    "kiro:check": "node tools/qa/sync-kiro-specs.mjs --check",
+    "kiro:promote": "node tools/qa/sync-kiro-specs.mjs --promote",
+    "kiro:promote:all": "node tools/qa/sync-kiro-specs.mjs --promote-all --force",
+    "kiro:promote-steering": "node tools/qa/promote-kiro-steering.mjs",
+    "kiro:promote-steering:all": "node tools/qa/promote-kiro-steering.mjs --all --force",
+    "gate:all": "npm run format:check && npm run harness:check && npm run check-context-budget && npm run profiles:check && npm run workflow:check && npm run security:secrets && npm run backlog:check && npm run tasks:check && npm run status:check && npm run scaffold-drift:check",
+    "hooks": "git config core.hooksPath .githooks && echo 'git hooks activated'"
+  }
+}

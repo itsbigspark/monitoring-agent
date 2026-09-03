@@ -1,0 +1,6 @@
+name: bigspark-slides
+type: skill
+version: 2.0.0
+description: On-brand Bigspark PowerPoint decks built from scratch with pptxgenjs. Navy/teal visual language, Montserrat typography, card-based layouts. Includes importable helpers module, layout library, and visual QA loop integration. Use for any Bigspark client deck, pitch deck, or internal presentation.
+supports: [kiro, claude-code, cursor, copilot, codex]
+tags: [presentations, branding, pptx, pptxgenjs]

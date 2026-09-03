@@ -1,0 +1,6 @@
+name: bigspark-pitch-narrative
+type: skill
+version: 0.1.0
+description: Narrative structure patterns for exec, sales, and decision-memo decks. Use when planning the slide sequence for a pitch, board update, or position paper — pairs with bigspark-slides (visual brand) to give the deck a proven story arc. Three arcs covered, plus per-slide intents and short-form variants.
+supports: [kiro, claude-code, cursor, copilot, codex]
+tags: [presentations, narrative, planning]

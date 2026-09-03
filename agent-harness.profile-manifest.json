@@ -1,0 +1,60 @@
+{
+  "profiles": [
+    {
+      "id": "language:java-modern",
+      "name": "Modern Java Development",
+      "outputs": {
+        "standards": "docs/standards/language-java-modern.md",
+        "kiroSteering": ".kiro/steering/java-development.md"
+      }
+    },
+    {
+      "id": "language:python-modern",
+      "name": "Modern Python Development",
+      "outputs": {
+        "standards": "docs/standards/language-python-modern.md",
+        "kiroSteering": ".kiro/steering/python-development.md"
+      }
+    },
+    {
+      "id": "frontend:react-typescript",
+      "name": "React TypeScript Frontend",
+      "outputs": {
+        "standards": "docs/standards/frontend-react-typescript.md",
+        "kiroSteering": ".kiro/steering/frontend-development.md"
+      }
+    },
+    {
+      "id": "backend:api-service",
+      "name": "API Backend Service",
+      "outputs": {
+        "standards": "docs/standards/backend-api-service.md",
+        "kiroSteering": ".kiro/steering/backend-development.md"
+      }
+    },
+    {
+      "id": "crosscutting:logging",
+      "name": "Logging Standard",
+      "outputs": {
+        "standards": "docs/standards/crosscutting-logging.md",
+        "kiroSteering": ".kiro/steering/logging-review.md"
+      }
+    },
+    {
+      "id": "crosscutting:observability",
+      "name": "Observability Standard",
+      "outputs": {
+        "standards": "docs/standards/crosscutting-observability.md",
+        "kiroSteering": ".kiro/steering/observability-review.md"
+      }
+    },
+    {
+      "id": "crosscutting:maintainability",
+      "name": "Maintainability Review Standard",
+      "outputs": {
+        "standards": "docs/standards/crosscutting-maintainability.md",
+        "kiroSteering": ".kiro/steering/maintainability-review.md"
+      }
+    }
+  ]
+}

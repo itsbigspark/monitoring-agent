@@ -1,0 +1,15 @@
+{
+  "name": "mission-control-system-design",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Senior-stakeholder architecture deck for the Mission Control system design",
+  "main": "deck.js",
+  "scripts": {
+    "build": "node deck.js"
+  },
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "pptxgenjs": "4.0.1"
+  }
+}

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Crop the architecture PNG to content, then insert it as a new slide after
-slide 8 of the existing deck (in place, preserving other slides)."""
+"""Legacy helper: crop the architecture PNG and insert it after slide 8.
+
+The current ``build_deck.py`` already embeds the diagram when the cropped PNG exists;
+do not run this helper after a full rebuild or it will append a duplicate diagram slide.
+"""
 from PIL import Image, ImageChops
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -63,7 +66,7 @@ left=Emu(int((SW-w)/2)); top=Emu(int(area_top+(avail_h-h)/2))
 s.shapes.add_picture(CROP,left,top,width=w,height=h)
 s.notes_slide.notes_text_frame.text=(
     "Companion visual to the architecture slide. Walk: ServiceNow -> ingestion/triage "
-    "-> LangGraph investigation graph -> MCP layer -> read-only data sources; "
+    "-> Agents SDK investigation pipeline -> MCP layer -> read-only data sources; "
     "model-agnostic LLM + isolated playground on the right; everything inside the "
     "client environment boundary; outputs go back to the ticket / PR / Teams for "
     "human review.")

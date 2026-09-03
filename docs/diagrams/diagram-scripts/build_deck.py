@@ -197,7 +197,8 @@ bullets(s, [
     "everything.",
     "Every diagnosis carries a confidence level and a full evidence trail.",
     "Every tool call and decision is logged for a complete audit trail.",
-], y=Inches(4.3), size=16, gap=8)
+    "Human verdicts feed a golden dataset — tracking accuracy, fix acceptance and MTTD over time.",
+], y=Inches(4.18), w=Inches(12), h=Inches(2.55), size=15.5, gap=7)
 notes(s, "The playground step (highlighted) is where it validates a candidate fix "
          "safely before proposing it.")
 
@@ -236,8 +237,8 @@ notes(s, "Key commercial framing: value does not require solving 100%. Even part
 s = slide()
 header(s, "Architecture", "Built to scale and to swap parts out")
 bullets(s, [
-    "LangGraph orchestration — a stateful, multi-phase investigation graph with "
-    "durable state, human-in-the-loop, and full observability.",
+    "Agent orchestration (OpenAI Agents SDK) — a deterministic pipeline with agentic "
+    "loops for evidence-gathering and fix-validation; full audit trace.",
     "MCP-first integration — reuses the existing Splunk MCP; each new system or "
     "incident type is a new connector + playbook, not a rewrite.",
     "Model-agnostic LLM — swap between Bedrock, self-hosted/in-VPC, or local "
@@ -245,9 +246,14 @@ bullets(s, [
     "Codebase enrichment (Intent Layer) — hierarchical, in-repo context so the "
     "agent understands the architecture before reading a line of code.",
     "Fully deployed inside the client environment — one isolated instance per client.",
-], y=Inches(1.8), size=17)
+    "Portable by design — the same versioned containers run on-prem or in any cloud via "
+    "Compose / Helm; air-gap capable and built on open protocols.",
+], y=Inches(1.72), size=16)
 notes(s, "Three pillars to land: MCP-first (scales), model-agnostic (compliance/lock-in), "
-         "in-client (data never leaves). Intent Layer is the quality multiplier.")
+         "in-client (data never leaves). Intent Layer is the quality multiplier. Engine note: "
+         "Sentinel uses the OpenAI Agents SDK (right-sized; human gate is a post-run boundary, not "
+         "a mid-run pause); LangGraph is kept for heavier future incident types, chosen per type "
+         "behind shared seams.")
 
 # ----------------------------------------------- 8b ARCHITECTURE DIAGRAM
 # Companion visual. Requires sentinel-architecture.png (cropped) from
@@ -268,7 +274,7 @@ if _os.path.exists(_diagram):
     _left = Emu(int((SW - _w) / 2)); _top = Emu(int(_atop + (_ah - _h) / 2))
     s.shapes.add_picture(_diagram, _left, _top, width=_w, height=_h)
     notes(s, "Companion visual to the architecture slide: ServiceNow -> ingestion/triage "
-             "-> LangGraph graph -> MCP layer -> read-only data sources; model-agnostic "
+             "-> Agents SDK pipeline -> MCP layer -> read-only data sources; model-agnostic "
              "LLM + isolated playground on the right; all inside the client boundary; "
              "outputs go back to ticket / PR / Teams for human review.")
 
@@ -296,6 +302,42 @@ for i, (t, d) in enumerate(cards):
         [[(d, 12.5, False, SLATE)]])
 notes(s, "This slide is what gets you past infosec. Lead with read-only + in-client + "
          "human-in-the-loop.")
+
+# ------------------------------------------------------ 9b DEPLOYMENT & ONBOARDING
+s = slide()
+header(s, "Deployment & onboarding", "Designed to run anywhere — without client-specific forks")
+txt(s, Inches(0.7), Inches(1.62), Inches(12), Inches(0.65),
+    [[("One product, configured for each client and validated before go-live:",
+       16, False, SLATE)]])
+dcards = [
+    ("Portable by default",
+     "The same versioned container images run on-prem or in AWS, Azure or GCP — via "
+     "Docker Compose or Helm, with an offline bundle for air-gapped environments."),
+    ("Configuration, not custom code",
+     "A deployment is a reviewed config bundle + secret references + MCP/content-source "
+     "endpoints. Open protocols avoid cloud lock-in and per-client forks."),
+    ("Preflight before go-live",
+     "The onboarding CLI validates config, connectivity, documentation access and index "
+     "freshness, then bootstraps and smoke-tests retrieval and an investigation."),
+]
+dn = 3; dgap = Inches(0.3); dtotal = SW - Inches(1.4)
+dcw = Emu(int((dtotal - dgap*(dn-1)) / dn)); dx = Inches(0.7); dy = Inches(2.35)
+for title, desc in dcards:
+    rect(s, dx, dy, dcw, Inches(3.15), LIGHT)
+    rect(s, dx, dy, dcw, Inches(0.78), NAVY)
+    txt(s, dx, dy, dcw, Inches(0.78), [[(title, 15, True, WHITE)]],
+        align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    txt(s, Emu(dx+Inches(0.25)), Emu(dy+Inches(1.02)),
+        Emu(dcw-Inches(0.5)), Inches(1.95), [[(desc, 13.2, False, SLATE)]])
+    dx = Emu(dx + dcw + dgap)
+rect(s, Inches(0.7), Inches(5.8), dtotal, Inches(0.72), RGBColor(0xE4,0xF3,0xF6))
+txt(s, Inches(0.85), Inches(5.8), Emu(dtotal-Inches(0.3)), Inches(0.72),
+    [[("One isolated instance per client · no phone-home · all code, evidence and inference stay inside the approved boundary",
+       13.5, True, NAVY)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+notes(s, "This is the newly designed deployment model, not a claim that every packaging and "
+         "onboarding component is already implemented. The key message is repeatability: shared "
+         "versioned images, per-client configuration, automated dependency/documentation checks, "
+         "and an air-gap path — not bespoke forks.")
 
 # ---------------------------------------------------------------- 10 TIER 3
 s = slide()
@@ -342,7 +384,7 @@ feats = [
     ("Sentinel", "Auto-investigation\n& resolution", True),
     ("Incident cockpit", "Per-application,\nhistorical view", False),
     ("Dashboard hub", "QuickSight, Tableau\nin one place", False),
-    ("Analytics", "MTTR, trends, KPIs", False),
+    ("Ask Mission Control", "Docs + deployed code\nQ&A · future", False),
 ]
 nf = 4; fgap = Inches(0.3); ftotal = SW - Inches(1.4)
 fcw = Emu(int((ftotal - fgap*(nf-1)) / nf)); fx = Inches(0.7); fy = Inches(3.45)
@@ -360,55 +402,58 @@ for name, desc, first in feats:
     fx = Emu(fx + fcw + fgap)
 rect(s, Inches(0.7), Inches(5.45), ftotal, Inches(0.62), RGBColor(0xE4,0xF3,0xF6))
 txt(s, Inches(0.7), Inches(5.45), ftotal, Inches(0.62),
-    [[("Application catalog — the shared foundation (apps · tiers · repos · log indices · data sources)",
+    [[("Application catalog — shared foundation (apps · repos · log sources · required docs · playbooks)",
        13, True, NAVY)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-txt(s, Inches(0.7), Inches(6.35), Inches(12), Inches(0.7),
-    [[("ServiceNow stays the system of record — Mission Control works off it, not instead of it.",
-       14, True, MUTED)]], align=PP_ALIGN.CENTER)
+txt(s, Inches(0.7), Inches(6.32), Inches(12), Inches(0.75),
+    [[("ServiceNow owns incidents. Confluence owns documentation. Mission Control indexes, enriches and acts — it does not replace either.",
+       13.2, True, MUTED)]], align=PP_ALIGN.CENTER)
 notes(s, "Frame: we ship Sentinel first (the wedge and the differentiator). It is the first "
          "feature of a broader platform, Mission Control, for the monitoring teams that own "
          "many apps. Same in-client deployment. ServiceNow stays authoritative. The dashboard "
          "hub and analytics follow on the same application-catalog foundation. Keep the focus on "
-         "Sentinel; this slide just shows where it's heading. (The knowledge-capture benefits this "
-         "enables are on the next slide.)")
+         "Sentinel; this slide just shows where it's heading. Ask Mission Control is explicitly "
+         "future scope: permission-aware Q&A over Confluence plus deployed code/Intent Layer and "
+         "authorised incident history. ServiceNow and Confluence remain authoritative.")
 
-# ----------------------------------------------- 11c KNOWLEDGE DIVIDEND
+# ----------------------------------------------- 11c OPERATIONAL KNOWLEDGE
 s = slide()
-header(s, "Beyond resolution", "A compounding knowledge dividend")
-txt(s, Inches(0.7), Inches(1.6), Inches(12), Inches(0.7),
-    [[("Sentinel and the support team run on captured knowledge — so the platform turns it "
-       "into a durable, growing asset:", 16, False, SLATE)]])
+header(s, "Operational knowledge", "Better handovers — without creating another source of truth")
+txt(s, Inches(0.7), Inches(1.58), Inches(12), Inches(0.8),
+    [[("Onboarding defines what every support team needs; Mission Control validates and indexes it for day-to-day use:",
+       16, False, SLATE)]])
 kcards = [
-    ("Smoother handovers (KT)",
-     "Dev → support knowledge transfer gets a structured, lasting home instead of fading "
-     "meetings — and it's reusable for every future joiner."),
-    ("Tribal knowledge, captured",
-     "The quirks, edge cases and process lore that live in people's heads become explicit and "
-     "durable — de-risking key-person dependency. Knowledge survives staff turnover."),
-    ("Documentation that pays off",
-     "Sentinel uses your docs to diagnose incidents, so good documentation finally shows "
-     "measurable payoff — faster, better resolution, visible per app."),
+    ("Confluence stays authoritative",
+     "Architecture, runbooks, ownership, dependencies, deployment/rollback and known failure "
+     "modes are authored and governed in Confluence. Mission Control stores requirements, links, "
+     "permissions and index freshness — not duplicate pages."),
+    ("Support teams become self-sufficient",
+     "Indexed documentation, code context and incident learning make routine questions and "
+     "investigations answerable without repeatedly returning to the original developers. "
+     "Engineering expertise stays focused on genuinely novel issues."),
+    ("Future: code-aware Q&A",
+     "Ask Mission Control will combine approved Confluence content with the relevant deployed "
+     "code / Intent Layer and authorised incident history — a cited answer grounded in more than "
+     "documentation alone."),
 ]
 nk = 3; kgap = Inches(0.3); ktotal = SW - Inches(1.4)
 kcw = Emu(int((ktotal - kgap*(nk-1)) / nk)); kx = Inches(0.7); ky = Inches(2.5)
-for t, d in kcards:
-    rect(s, kx, ky, kcw, Inches(3.3), LIGHT)
+for title, desc in kcards:
+    rect(s, kx, ky, kcw, Inches(3.35), LIGHT)
     rect(s, kx, ky, kcw, Inches(0.85), NAVY)
     txt(s, Emu(kx+Inches(0.15)), ky, Emu(kcw-Inches(0.3)), Inches(0.85),
-        [[(t, 15, True, WHITE)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    txt(s, Emu(kx+Inches(0.25)), Emu(ky+Inches(1.05)), Emu(kcw-Inches(0.5)), Inches(2.1),
-        [[(d, 13.5, False, SLATE)]])
+        [[(title, 14.5, True, WHITE)]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    txt(s, Emu(kx+Inches(0.23)), Emu(ky+Inches(1.02)), Emu(kcw-Inches(0.46)), Inches(2.15),
+        [[(desc, 12.8, False, SLATE)]])
     kx = Emu(kx + kcw + kgap)
-txt(s, Inches(0.7), Inches(6.15), Inches(12), Inches(0.9),
-    [[("A virtuous cycle: the more you capture, the better Sentinel and your support team "
-       "perform — and the more visible the payoff of capturing it.", 15, True, NAVY)]],
-    align=PP_ALIGN.CENTER)
-notes(s, "PRESENTER FRAMING — keep these as UPSIDE, never criticism: (1) frame as 'the platform "
-         "rewards and surfaces good knowledge', not 'your docs are bad'; (2) it's a MULTIPLIER, "
-         "not a prerequisite — Sentinel works on logs + code regardless. Order the story from the "
-         "cleanest point: lead with KT/handover (pure operational win), then tribal-knowledge "
-         "capture (bus-factor / survives turnover), then the documentation flywheel (docs finally "
-         "pay off, visible per-app KPIs).")
+txt(s, Inches(0.7), Inches(6.12), Inches(12), Inches(0.85),
+    [[("Outcome: a durable handover, fewer routine developer escalations, and application knowledge that improves with use.",
+       14.5, True, NAVY)]], align=PP_ALIGN.CENTER)
+notes(s, "Lead with structured handover and operational resilience, not criticism of current "
+         "documentation. Confluence remains the source of truth; Mission Control defines the "
+         "onboarding contract, checks accessibility/freshness and maintains a permission-aware "
+         "index with citations. Say 'reduces routine dependence', not 'replaces developers'. "
+         "Ask Mission Control is roadmap. The Rovo distinction is code context: planned answers "
+         "combine Confluence with deployed code/Intent Layer and incident history, not docs alone.")
 
 # ---------------------------------------------------------------- 12 VALUE
 s = slide()
@@ -416,8 +461,8 @@ header(s, "The value", "Why this matters")
 cards = [
     ("Faster resolution", "Compresses the slowest phase — time-to-diagnosis."),
     ("Senior-engineer leverage", "Frees scarce expertise from repetitive triage."),
-    ("Consistency", "Every in-scope incident gets a thorough investigation."),
-    ("Knowledge capture", "Recurring failure patterns become a durable asset."),
+    ("Measured quality", "Human verdicts + golden-set replay track accuracy and acceptance."),
+    ("Support independence", "Structured handover reduces routine developer escalations."),
     ("Low-risk proving ground", "KPI gains on Tier 3 before critical systems."),
     ("Partial automation wins", "Resolve some, accelerate the rest — net big gain."),
 ]
@@ -432,7 +477,9 @@ for i, (t, d) in enumerate(cards):
         [[(t, 15, True, NAVY)]])
     txt(s, Emu(x+Inches(0.2)), Emu(y+Inches(0.8)), Emu(cw2-Inches(0.3)), Inches(1.0),
         [[(d, 12.5, False, SLATE)]])
-notes(s, "Baseline these metrics before rollout so the 'after' delta is provable.")
+notes(s, "Baseline MTTD, accuracy, fix acceptance, senior-engineer hours and routine developer "
+         "escalations before rollout so the after delta is provable. Human verdict capture and "
+         "golden-dataset replay answer the buyer question: 'how do we know it's right?'")
 
 # ---------------------------------------------------------------- 13 ENGAGEMENT
 s = slide()
@@ -442,9 +489,9 @@ total = SW - Inches(1.4)
 cw = Emu(int((total - gap*(n-1)) / n))
 stages = [
     ("1 · Platform analysis", "A short, fixed-fee analysis of a target platform — "
-     "scopes the work and prices the implementation up front."),
-    ("2 · Proof of Concept", "Stand up Sentinel on that platform and demonstrate it "
-     "on real incidents — proof before commitment."),
+     "scope evidence access, documentation readiness, security and success baselines up front."),
+    ("2 · Proof of Concept", "Configure Sentinel, preflight every dependency and demonstrate it "
+     "on real or historical incidents — proof before commitment."),
     ("3 · Scaled rollout", "Implement platform by platform (fixed-price or T&M). "
      "Shared components built once; only platform-specific work per system."),
 ]
@@ -458,8 +505,8 @@ for t, d in stages:
         [[(d, 14, False, SLATE)]])
     x = Emu(x + cw + gap)
 txt(s, Inches(0.7), Inches(5.9), Inches(12), Inches(1),
-    [[("Each platform is slightly different — its knowledge base and data-access "
-       "needs drive the incremental cost.", 14, False, MUTED)]], align=PP_ALIGN.CENTER)
+    [[("The product stays shared: each rollout adds a reviewed config bundle, approved knowledge sources, connectors and playbooks — not a fork.",
+       13.5, False, MUTED)]], align=PP_ALIGN.CENTER)
 notes(s, "Client-safe commercial framing. Keep specific numbers for the live "
          "conversation. The analysis-first step de-risks pricing for both sides.")
 

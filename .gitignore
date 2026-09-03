@@ -1,0 +1,8 @@
+# HARNESS-V1-POSITIONING — personal AI coding tool adapter projections.
+# .kiro/ stays committed (project-shared agent context); these stay personal.
+# See docs/tickets/HARNESS-V1-POSITIONING.md.
+.claude/
+.agents/
+.cursor/
+.github/copilot/
+# end HARNESS-V1-POSITIONING personal adapter projections.
